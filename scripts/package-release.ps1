@@ -38,6 +38,7 @@ param(
     [string]$RepoUrl = "https://github.com/mohamedfelfl/student_management_system",
     [string]$Token,
     [switch]$Publish,
+    [switch]$Clean,
     [string]$Channel = "win"
 )
 
@@ -124,12 +125,16 @@ if (-not $vpkInstalled) {
 
 # 3. Create Releases output directory
 $releasesDir = Join-Path $PSScriptRoot "..\Releases"
+if ($Clean -and (Test-Path $releasesDir)) {
+    Write-Host "Cleaning previous release artifacts in $releasesDir..." -ForegroundColor Yellow
+    Remove-Item -Path "$releasesDir\*" -Recurse -Force -ErrorAction SilentlyContinue
+}
 if (-not (Test-Path $releasesDir)) {
     New-Item -ItemType Directory -Path $releasesDir -Force | Out-Null
 }
 
-# 4. Download previous releases for delta generation if RepoUrl provided
-if ($RepoUrl) {
+# 4. Download previous releases for delta generation if RepoUrl provided (unless -Clean is specified)
+if ($RepoUrl -and -not $Clean) {
     Write-Host "`nDownloading previous releases from GitHub for delta generation..." -ForegroundColor Cyan
     try {
         vpk download github --repoUrl $RepoUrl --outputDir $releasesDir
@@ -167,7 +172,7 @@ $packArgs = @(
     "--packVersion", $Version,
     "--packDir", $buildRunnerDir,
     "--mainExe", "student_management_system.exe",
-    "--packTitle", "Student Management System",
+    "--packTitle", "Elite Series",
     "--channel", $Channel,
     "-o", $releasesDir
 )
