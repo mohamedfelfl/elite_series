@@ -35,7 +35,7 @@
 param(
     [string]$Version,
     [string]$PackId = "StudentManagementSystem",
-    [string]$RepoUrl = "https://github.com/mohamedfelfl/student_management_system",
+    [string]$RepoUrl = "https://github.com/mohamedfelfl/elite_series",
     [string]$Token,
     [switch]$Publish,
     [switch]$Clean,

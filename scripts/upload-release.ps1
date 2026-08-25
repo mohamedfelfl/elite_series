@@ -1,7 +1,7 @@
 param(
-    [string]$Version = "1.0.7",
+    [string]$Version = "1.0.0",
     [string]$Token,
-    [string]$RepoUrl = "https://github.com/mohamedfelfl/student_management_system"
+    [string]$RepoUrl = "https://github.com/mohamedfelfl/elite_series"
 )
 
 $ErrorActionPreference = 'Stop'

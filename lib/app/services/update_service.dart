@@ -44,7 +44,7 @@ class VelopackUpdateService implements UpdateService {
 
   VelopackUpdateService({
     this.owner = 'mohamedfelfl',
-    this.repo = 'student_management_system',
+    this.repo = 'elite_series',
     http.Client? httpClient,
   }) : _httpClient = httpClient ?? http.Client();
 
