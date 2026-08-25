@@ -55,11 +55,11 @@ class QrCardTemplateWidget extends StatelessWidget {
 
             // ── Dynamic Overlaid Data (Confined to Left Side of Card) ──
 
-            // 1. Student Name (Under اسم الطالب, right-aligned to label, extending left)
+            // 1. Student Name (Under اسم الطالب, right-aligned, extending left)
             Positioned(
               left: cardW * 0.05,
-              top: cardH * 0.355,
-              width: cardW * 0.53,
+              top: cardH * 0.325,
+              width: cardW * 0.52,
               height: cardH * 0.085,
               child: Align(
                 alignment: Alignment.centerRight,
@@ -72,9 +72,10 @@ class QrCardTemplateWidget extends StatelessWidget {
                       student.fullName,
                       textAlign: TextAlign.right,
                       style: AppTypography.cairo(
-                        fontSize: 18.0 * scale,
+                        fontSize: 17.0 * scale,
                         fontWeight: FontWeight.w900,
                         color: const Color(0xFF0F172A),
+                        height: 1.1,
                       ),
                     ),
                   ),
@@ -85,8 +86,8 @@ class QrCardTemplateWidget extends StatelessWidget {
             // 2. Stage Name (Under المرحلة)
             Positioned(
               left: cardW * 0.05,
-              top: cardH * 0.505,
-              width: cardW * 0.53,
+              top: cardH * 0.485,
+              width: cardW * 0.52,
               height: cardH * 0.075,
               child: Align(
                 alignment: Alignment.centerRight,
@@ -99,9 +100,10 @@ class QrCardTemplateWidget extends StatelessWidget {
                       StudentCardData.formatStageArabic(student.stageName),
                       textAlign: TextAlign.right,
                       style: AppTypography.cairo(
-                        fontSize: 14.0 * scale,
+                        fontSize: 13.0 * scale,
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFF0F172A),
+                        height: 1.1,
                       ),
                     ),
                   ),
@@ -112,8 +114,8 @@ class QrCardTemplateWidget extends StatelessWidget {
             // 3. Group Name (Under المجموعة)
             Positioned(
               left: cardW * 0.05,
-              top: cardH * 0.655,
-              width: cardW * 0.53,
+              top: cardH * 0.615,
+              width: cardW * 0.52,
               height: cardH * 0.075,
               child: Align(
                 alignment: Alignment.centerRight,
@@ -128,9 +130,10 @@ class QrCardTemplateWidget extends StatelessWidget {
                           : _formatScheduleArabic(student.groupSchedule),
                       textAlign: TextAlign.right,
                       style: AppTypography.cairo(
-                        fontSize: 12.5 * scale,
+                        fontSize: 12.0 * scale,
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFF0F172A),
+                        height: 1.1,
                       ),
                     ),
                   ),
@@ -138,27 +141,29 @@ class QrCardTemplateWidget extends StatelessWidget {
               ),
             ),
 
-            // 4. Student Code (Under كود الطالب)
+            // 4. Time / Schedule (Under الوقت)
             Positioned(
               left: cardW * 0.05,
-              top: cardH * 0.825,
-              width: cardW * 0.53,
+              top: cardH * 0.745,
+              width: cardW * 0.52,
               height: cardH * 0.075,
               child: Align(
                 alignment: Alignment.centerRight,
                 child: Directionality(
-                  textDirection: TextDirection.ltr,
+                  textDirection: TextDirection.rtl,
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerRight,
                     child: Text(
-                      student.studentCode,
+                      student.groupSchedule.isNotEmpty
+                          ? _formatScheduleArabic(student.groupSchedule)
+                          : student.studentCode,
                       textAlign: TextAlign.right,
-                      style: AppTypography.outfit(
-                        fontSize: 15.0 * scale,
-                        fontWeight: FontWeight.w900,
+                      style: AppTypography.cairo(
+                        fontSize: 12.0 * scale,
+                        fontWeight: FontWeight.w800,
                         color: const Color(0xFF0F172A),
-                        letterSpacing: 0.5,
+                        height: 1.1,
                       ),
                     ),
                   ),
@@ -168,10 +173,10 @@ class QrCardTemplateWidget extends StatelessWidget {
 
             // 5. QR Code inside the rounded white box container on the right
             Positioned(
-              left: cardW * 0.650,
-              top: cardH * 0.375,
-              width: cardW * 0.235,
-              height: cardH * 0.370,
+              left: cardW * 0.655,
+              top: cardH * 0.38,
+              width: cardW * 0.23,
+              height: cardH * 0.37,
               child: Center(
                 child: QrImageView(
                   data: student.qrPayload,

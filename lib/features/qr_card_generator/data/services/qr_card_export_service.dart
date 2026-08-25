@@ -101,10 +101,18 @@ class QrCardExportService implements IQrCardExportService {
         child: Directionality(
           textDirection: ui.TextDirection.rtl,
           child: MediaQuery(
-            data: MediaQueryData.fromView(view),
+            data: MediaQueryData(
+              size: targetSize,
+              devicePixelRatio: pixelRatio,
+              textScaler: TextScaler.noScaling,
+            ),
             child: Material(
               color: Colors.transparent,
-              child: widget,
+              child: SizedBox(
+                width: targetSize.width,
+                height: targetSize.height,
+                child: widget,
+              ),
             ),
           ),
         ),

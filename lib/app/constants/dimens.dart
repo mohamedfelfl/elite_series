@@ -103,9 +103,9 @@ class AppDimens {
   static double get iconSize48 => 48.r;
   static double get iconSize64 => 64.r;
 
-  // QR Card Specific Dimensions
+  // QR Card Specific Dimensions (CR80 Standard Ratio 1024 x 647)
   static double get cardDefaultWidth => 600.0;
-  static double get cardDefaultHeight => 350.0;
+  static double get cardDefaultHeight => 600.0 * 647.0 / 1024.0; // 379.1015625
   static double get cardDividerWidth => 2.5.w;
   static double get cardLogoSize => 90.r;
   static double get qrFrameSize => 135.r;

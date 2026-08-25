@@ -144,12 +144,15 @@ class AppTypography {
     FontWeight? fontWeight,
     Color? color,
     double? letterSpacing,
+    double? height,
   }) =>
-      GoogleFonts.outfit(
+      TextStyle(
+        fontFamily: 'Outfit',
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
         letterSpacing: letterSpacing,
+        height: height ?? 1.2,
       );
 
   static TextStyle cairo({
@@ -157,12 +160,15 @@ class AppTypography {
     FontWeight? fontWeight,
     Color? color,
     double? letterSpacing,
+    double? height,
   }) =>
-      GoogleFonts.cairo(
+      TextStyle(
+        fontFamily: 'Cairo',
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
         letterSpacing: letterSpacing,
+        height: height ?? 1.2,
       );
 
   // ─── HELPER: Build TextTheme ───
