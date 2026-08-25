@@ -1,0 +1,94 @@
+name: student_management_system
+description: "A premium Student Management System for managing students, payments, attendance, exams, and reports."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Database
+  sqflite_sqlcipher: ^3.4.0
+  sqflite_common_ffi: ^2.3.4
+  sqlcipher_library_windows: ^1.0.2
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  # State Management
+  flutter_bloc: ^9.1.0
+
+  # Routing
+  auto_route: ^9.2.2
+
+  # QR Code
+  mobile_scanner: ^6.0.4
+  qr_flutter: ^4.1.0
+
+  # Localization
+  easy_localization: ^3.0.7
+
+  # UI Scaling
+  flutter_screenutil: ^5.9.3
+
+  # PDF Reports
+  pdf: ^3.11.2
+  printing: ^5.14.0
+
+  # Charts
+  fl_chart: ^0.70.2
+
+  # Data Tables
+  data_table_2: ^2.5.15
+
+  # Dependency Injection
+  get_it: ^8.0.3
+
+  # Models
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+
+  # Fonts
+  google_fonts: ^8.0.2
+
+  # Security
+  flutter_secure_storage: ^9.2.4
+  crypto: ^3.0.6
+  intl: ^0.20.2
+  sqlite3: ^2.4.6
+  file_picker: ^8.0.0
+  window_manager: ^0.5.1
+  http: ^1.2.2
+  package_info_plus: ^8.1.2
+  flutter_animate: ^4.5.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.14
+  auto_route_generator: ^9.0.0
+  freezed: ^3.0.0
+  json_serializable: ^6.9.4
+  flutter_launcher_icons: ^0.14.3
+
+flutter:
+  uses-material-design: true
+  generate: false
+  assets:
+    - assets/translations/
+    - assets/images/
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  windows:
+    generate: true
+    image_path: "assets/images/logo.png"
+    icon_size: 256
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
