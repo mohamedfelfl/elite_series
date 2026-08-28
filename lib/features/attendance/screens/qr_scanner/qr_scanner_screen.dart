@@ -9,6 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../app/constants/dimens.dart';
+import '../../../../app/utils/qr_code_helper.dart';
 import '../../../../generated/locale_keys.g.dart';
 import '../../cubits/attendance_cubit.dart';
 import '../../cubits/lesson_cubit.dart';
@@ -61,7 +62,10 @@ class _QrScannerScreenState extends State<QrScannerScreen>
     super.dispose();
   }
 
-  void _onScanReceived(String serial) {
+  void _onScanReceived(String rawScan) {
+    final serial = QrCodeHelper.extractSerialNumber(rawScan);
+    if (serial.isEmpty) return;
+
     final activeLesson = context.read<LessonCubit>().state.activeLesson;
     if (activeLesson != null) {
       context.read<LessonCubit>().recordScanInActiveLesson(serial);

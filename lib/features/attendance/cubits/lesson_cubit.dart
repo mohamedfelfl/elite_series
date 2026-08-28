@@ -6,6 +6,7 @@ import 'package:sqflite_sqlcipher/sqflite.dart';
 import '../../../../generated/locale_keys.g.dart';
 import '../../../app/constants/db_queries.dart';
 import '../../../app/services/database_service.dart';
+import '../../../app/utils/qr_code_helper.dart';
 import '../models/attendance.dart';
 import '../models/lesson.dart';
 
@@ -267,7 +268,7 @@ class LessonCubit extends Cubit<LessonState> {
   }
 
   /// Record a scan inside the active lesson session.
-  Future<void> recordScanInActiveLesson(String serialNumber) async {
+  Future<void> recordScanInActiveLesson(String rawScan) async {
     final active = state.activeLesson;
     if (active == null || active.id == null) {
       emit(
@@ -279,15 +280,27 @@ class LessonCubit extends Cubit<LessonState> {
       return;
     }
 
+    final serialNumber = QrCodeHelper.extractSerialNumber(rawScan);
+    if (serialNumber.isEmpty) return;
+
     try {
       final Database db = await _databaseService.database;
 
-      // Find student by serial
-      final List<Map<String, Object?>> students = await db.query(
+      // Find student by extracted serial
+      List<Map<String, Object?>> students = await db.query(
         DBQueries.tableStudents,
         where: 'serial_number = ?',
-        whereArgs: [serialNumber.trim()],
+        whereArgs: [serialNumber],
       );
+
+      // Fallback: if not found, check raw trimmed string if different
+      if (students.isEmpty && rawScan.trim() != serialNumber) {
+        students = await db.query(
+          DBQueries.tableStudents,
+          where: 'serial_number = ?',
+          whereArgs: [rawScan.trim()],
+        );
+      }
 
       if (students.isEmpty) {
         emit(

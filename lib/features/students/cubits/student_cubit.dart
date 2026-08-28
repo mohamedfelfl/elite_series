@@ -2,10 +2,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 
-import '../../../app/services/database_service.dart';
 import '../../../app/constants/db_queries.dart';
 import '../../../app/di/injection.dart';
 import '../../../app/services/data_migration_service.dart';
+import '../../../app/services/database_service.dart';
+import '../../../app/utils/qr_code_helper.dart';
 
 part 'student_cubit.freezed.dart';
 
@@ -272,13 +273,24 @@ class StudentCubit extends Cubit<StudentState> {
     }
   }
 
-  Future<Map<String, dynamic>?> getStudentBySerial(String serial) async {
+  Future<Map<String, dynamic>?> getStudentBySerial(String rawSerial) async {
+    final serial = QrCodeHelper.extractSerialNumber(rawSerial);
+    if (serial.isEmpty) return null;
+
     try {
       final Database db = await _databaseService.database;
-      final List<Map<String, Object?>> results = await db.rawQuery(
+      List<Map<String, Object?>> results = await db.rawQuery(
         DBQueries.getStudentBySerial,
         <Object?>[serial],
       );
+
+      if (results.isEmpty && rawSerial.trim() != serial) {
+        results = await db.rawQuery(
+          DBQueries.getStudentBySerial,
+          <Object?>[rawSerial.trim()],
+        );
+      }
+
       return results.isNotEmpty ? results.first : null;
     } catch (e) {
       return null;

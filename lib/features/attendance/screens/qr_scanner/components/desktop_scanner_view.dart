@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../../app/constants/dimens.dart';
 import '../../../../../app/shared/animations/app_animations.dart';
+import '../../../../../app/utils/qr_code_helper.dart';
 import '../../../../../generated/locale_keys.g.dart';
 import '../../../cubits/attendance_cubit.dart';
 
@@ -20,8 +21,10 @@ class DesktopScannerView extends StatelessWidget {
   });
 
   void _handleScan(BuildContext context, String rawValue) {
-    final serial = rawValue.trim();
+    final serial = QrCodeHelper.extractSerialNumber(rawValue);
     if (serial.isEmpty) return;
+
+    manualController.clear();
 
     if (onScan != null) {
       onScan!(serial);

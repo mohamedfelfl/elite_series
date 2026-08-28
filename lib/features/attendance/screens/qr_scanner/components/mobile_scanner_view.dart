@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../../../app/utils/qr_code_helper.dart';
 import '../../../../../generated/locale_keys.g.dart';
 import '../../../cubits/attendance_cubit.dart';
 import 'scanner_laser_beam.dart';
@@ -21,8 +22,10 @@ class MobileScannerView extends StatelessWidget {
   });
 
   void _handleScan(BuildContext context, String rawValue) {
-    final serial = rawValue.trim();
+    final serial = QrCodeHelper.extractSerialNumber(rawValue);
     if (serial.isEmpty) return;
+
+    manualController.clear();
 
     if (onScan != null) {
       onScan!(serial);

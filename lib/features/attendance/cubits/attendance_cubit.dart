@@ -6,6 +6,7 @@ import '../../../../generated/locale_keys.g.dart';
 
 import '../../../app/constants/db_queries.dart';
 import '../../../app/services/database_service.dart';
+import '../../../app/utils/qr_code_helper.dart';
 import '../../../app/utils/time_helper.dart';
 import '../models/attendance.dart';
 
@@ -84,23 +85,35 @@ class AttendanceCubit extends Cubit<AttendanceState> {
   }
 
   /// Record attendance via QR scan or manual ID entry.
-  /// [serialNumber] is the student's serial number from the QR code.
+  /// [rawScan] is the student's serial number or QR code payload.
   /// [lessonId] is the optional active lesson session ID.
   Future<void> recordAttendanceBySerial(
-    String serialNumber, {
+    String rawScan, {
     int? lessonId,
     AttendanceStatus status = AttendanceStatus.attended,
     String notes = '',
   }) async {
+    final serialNumber = QrCodeHelper.extractSerialNumber(rawScan);
+    if (serialNumber.isEmpty) return;
+
     try {
       final Database db = await _databaseService.database;
 
-      // Find student by serial number
-      final List<Map<String, Object?>> students = await db.query(
+      // Find student by extracted serial number
+      List<Map<String, Object?>> students = await db.query(
         DBQueries.tableStudents,
         where: 'serial_number = ?',
-        whereArgs: <Object?>[serialNumber.trim()],
+        whereArgs: <Object?>[serialNumber],
       );
+
+      // Fallback: if not found, check raw trimmed string if different
+      if (students.isEmpty && rawScan.trim() != serialNumber) {
+        students = await db.query(
+          DBQueries.tableStudents,
+          where: 'serial_number = ?',
+          whereArgs: <Object?>[rawScan.trim()],
+        );
+      }
 
       if (students.isEmpty) {
         emit(
