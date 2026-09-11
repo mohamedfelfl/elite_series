@@ -78,7 +78,7 @@ class _LessonAttendanceReportFormState
                   items: groupState.groups.map((g) {
                     return DropdownMenuItem<int>(
                       value: g['id'] as int,
-                      child: Text(_cleanGroupName(g['name'] as String)),
+                      child: Text(g['name'] as String),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -198,13 +198,5 @@ class _LessonAttendanceReportFormState
         ],
       ),
     );
-  }
-
-  String _cleanGroupName(String name) {
-    String n = name.trim();
-    n = n.replaceAll('الثللاثاء', 'الثلاثاء');
-    n = n.replaceAll(RegExp(r'\s*[123]\s*ث\s*'), ' ');
-    n = n.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return n;
   }
 }

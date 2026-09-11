@@ -7,8 +7,8 @@ import '../../../../../../generated/locale_keys.g.dart';
 import '../../../../groups/cubits/group_cubit.dart';
 import '../../../../notes/cubits/notes_cubit.dart';
 import '../../../../notes/cubits/notes_state.dart';
-import '../../../../students/cubits/student_cubit.dart';
 import '../../../cubits/report_cubit.dart';
+import 'student_search_picker.dart';
 
 enum NotesReportMode { all, student, group }
 
@@ -76,33 +76,12 @@ class _NotesDeliveryReportFormState extends State<NotesDeliveryReportForm> {
         SizedBox(height: 24.h),
 
         if (_notesReportMode == NotesReportMode.student) ...[
-          BlocBuilder<StudentCubit, StudentState>(
-            builder: (context, state) {
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  return DropdownMenu<int?>(
-                    width: constraints.maxWidth,
-                    initialSelection: _selectedNoteStudentId,
-                    label: Text(LocaleKeys.student.tr()),
-                    leadingIcon: const Icon(Icons.person),
-                    enableSearch: true,
-                    enableFilter: true,
-                    dropdownMenuEntries: [
-                      ...state.students.map(
-                        (s) => DropdownMenuEntry<int?>(
-                          value: s['id'] as int,
-                          label: '${s['name']} (${s['serial_number']})',
-                        ),
-                      ),
-                    ],
-                    onSelected: (v) {
-                      setState(() {
-                        _selectedNoteStudentId = v;
-                      });
-                    },
-                  );
-                },
-              );
+          StudentSearchPicker(
+            selectedStudentId: _selectedNoteStudentId,
+            onStudentSelected: (student) {
+              setState(() {
+                _selectedNoteStudentId = student?['id'] as int?;
+              });
             },
           ),
           SizedBox(height: 16.h),

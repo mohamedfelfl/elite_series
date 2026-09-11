@@ -6,10 +6,15 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:printing/printing.dart';
 
 import '../../../../generated/locale_keys.g.dart';
+import '../../../assistants/cubits/assistant_cubit.dart';
 import '../../../groups/cubits/group_cubit.dart';
-import '../../../students/cubits/student_cubit.dart';
+import '../../../notes/cubits/notes_cubit.dart';
+import '../../../exams/cubits/exam_cubit.dart';
 import '../../cubits/report_cubit.dart';
+import 'components/assistant_report_form.dart';
 import 'components/attendance_date_report_form.dart';
+import 'components/highest_marks_report_form.dart';
+import 'components/notes_delivery_report_form.dart';
 import 'components/payment_report_forms.dart';
 import 'components/student_report_form.dart';
 import 'components/lesson_attendance_report_form.dart';
@@ -28,8 +33,10 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<StudentCubit>().loadStudents();
     context.read<GroupCubit>().loadGroups();
+    context.read<AssistantCubit>().loadAssistants();
+    context.read<NotesCubit>().loadNotes();
+    context.read<ExamCubit>().loadExams();
   }
 
   @override
@@ -136,23 +143,17 @@ class _ReportScreenState extends State<ReportScreen> {
               setState(() => _selectedType = ReportType.student),
         ),
         ChoiceChip(
+          label: Text(LocaleKeys.highest_marks.tr()),
+          selected: _selectedType == ReportType.highestMarks,
+          onSelected: (_) =>
+              setState(() => _selectedType = ReportType.highestMarks),
+        ),
+        ChoiceChip(
           label: Text(LocaleKeys.attendance_date.tr()),
           selected: _selectedType == ReportType.attendanceDate,
           onSelected: (_) => setState(
             () => _selectedType = ReportType.attendanceDate,
           ),
-        ),
-        ChoiceChip(
-          label: Text(LocaleKeys.lesson_report.tr()),
-          selected: _selectedType == ReportType.lessonSession,
-          onSelected: (_) =>
-              setState(() => _selectedType = ReportType.lessonSession),
-        ),
-        ChoiceChip(
-          label: Text(LocaleKeys.group_summary_report.tr()),
-          selected: _selectedType == ReportType.groupAttendanceSummary,
-          onSelected: (_) =>
-              setState(() => _selectedType = ReportType.groupAttendanceSummary),
         ),
         ChoiceChip(
           label: Text(LocaleKeys.daily_payments.tr()),
@@ -168,6 +169,30 @@ class _ReportScreenState extends State<ReportScreen> {
             () => _selectedType = ReportType.groupPayments,
           ),
         ),
+        ChoiceChip(
+          label: Text(LocaleKeys.assistant_report.tr()),
+          selected: _selectedType == ReportType.assistant,
+          onSelected: (_) =>
+              setState(() => _selectedType = ReportType.assistant),
+        ),
+        ChoiceChip(
+          label: Text(LocaleKeys.notes_delivery.tr()),
+          selected: _selectedType == ReportType.notesDelivery,
+          onSelected: (_) =>
+              setState(() => _selectedType = ReportType.notesDelivery),
+        ),
+        ChoiceChip(
+          label: Text(LocaleKeys.lesson_report.tr()),
+          selected: _selectedType == ReportType.lessonSession,
+          onSelected: (_) =>
+              setState(() => _selectedType = ReportType.lessonSession),
+        ),
+        ChoiceChip(
+          label: Text(LocaleKeys.group_summary_report.tr()),
+          selected: _selectedType == ReportType.groupAttendanceSummary,
+          onSelected: (_) =>
+              setState(() => _selectedType = ReportType.groupAttendanceSummary),
+        ),
       ],
     );
   }
@@ -176,12 +201,18 @@ class _ReportScreenState extends State<ReportScreen> {
     switch (_selectedType) {
       case ReportType.student:
         return const StudentReportForm();
+      case ReportType.highestMarks:
+        return const HighestMarksReportForm();
       case ReportType.attendanceDate:
         return const AttendanceDateReportForm();
       case ReportType.dailyPayments:
         return const DailyPaymentsReportForm();
       case ReportType.groupPayments:
         return const GroupPaymentsReportForm();
+      case ReportType.assistant:
+        return const AssistantReportForm();
+      case ReportType.notesDelivery:
+        return const NotesDeliveryReportForm();
       case ReportType.lessonSession:
       case ReportType.absenteeFollowUp:
       case ReportType.groupAttendanceSummary:

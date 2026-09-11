@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../app/di/injection.dart';
+import '../../../../app/services/data_sync_service.dart';
 import '../../data/models/qr_card_config.dart';
 import '../../data/models/student_card_data.dart';
 import '../../domain/repositories/iqr_card_repository.dart';
@@ -7,13 +11,30 @@ import 'qr_card_state.dart';
 
 class QrCardCubit extends Cubit<QrCardState> {
   final IQrCardRepository _repository;
+  final DataSyncService? _dataSyncService;
+  StreamSubscription<SyncEntity>? _syncSub;
 
-  QrCardCubit({required IQrCardRepository repository})
-      : _repository = repository,
-        super(const QrCardState());
+  QrCardCubit({
+    required IQrCardRepository repository,
+    DataSyncService? dataSyncService,
+  })  : _repository = repository,
+        _dataSyncService = dataSyncService ??
+            (getIt.isRegistered<DataSyncService>()
+                ? getIt<DataSyncService>()
+                : null),
+        super(const QrCardState()) {
+    _syncSub = _dataSyncService?.syncStream.listen((entity) {
+      if ((entity == SyncEntity.students || entity == SyncEntity.groups) &&
+          state.allStudents.isNotEmpty) {
+        loadInitialData(silent: true);
+      }
+    });
+  }
 
-  Future<void> loadInitialData() async {
-    emit(state.copyWith(isLoading: true, error: null));
+  Future<void> loadInitialData({bool silent = false}) async {
+    if (!silent) {
+      emit(state.copyWith(isLoading: true, error: null));
+    }
     try {
       final groups = await _repository.getGroups();
       final stages = await _repository.getStages();
@@ -215,5 +236,11 @@ class QrCardCubit extends Cubit<QrCardState> {
         activePreviewStudent: preview,
       ),
     );
+  }
+
+  @override
+  Future<void> close() {
+    _syncSub?.cancel();
+    return super.close();
   }
 }

@@ -34,25 +34,62 @@ class PaymentHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                selectedStudent['name'] as String? ?? 'N/A',
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      selectedStudent['name'] as String? ?? 'N/A',
+                      style: textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  if (isFree) ...[
+                    SizedBox(width: 8.w),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10.w,
+                        vertical: 3.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: Colors.amber.shade700),
+                      ),
+                      child: Text(
+                        LocaleKeys.free_student.tr(),
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               SizedBox(height: 4.h),
-              Text(
-                LocaleKeys.total_payments.tr(
-                  args: [
-                    NumberFormat('#,##0').format(totalPaid),
-                    NumberFormat('#,##0').format(totalDue),
-                  ],
+              if (isFree)
+                Text(
+                  LocaleKeys.exempt_no_payments.tr(),
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: Colors.amber.shade900,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              else
+                Text(
+                  LocaleKeys.total_payments.tr(
+                    args: [
+                      NumberFormat('#,##0').format(totalPaid),
+                      NumberFormat('#,##0').format(totalDue),
+                    ],
+                  ),
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
-                style: textTheme.bodyLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
             ],
           ),
         ),

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../app/constants/db_queries.dart';
 import '../../../app/services/database_service.dart';
 import '../../../app/di/injection.dart';
 import '../../../app/services/data_migration_service.dart';
+import '../../../app/services/data_sync_service.dart';
 
 part 'group_cubit.freezed.dart';
 
@@ -20,13 +23,26 @@ abstract class GroupState with _$GroupState {
 
 class GroupCubit extends Cubit<GroupState> {
   final DatabaseService _databaseService;
+  final DataSyncService? _dataSyncService;
+  StreamSubscription<SyncEntity>? _syncSub;
 
-  GroupCubit({required DatabaseService databaseService})
-    : _databaseService = databaseService,
-      super(const GroupState());
+  GroupCubit({
+    required DatabaseService databaseService,
+    DataSyncService? dataSyncService,
+  })  : _databaseService = databaseService,
+        _dataSyncService = dataSyncService ?? (getIt.isRegistered<DataSyncService>() ? getIt<DataSyncService>() : null),
+        super(const GroupState()) {
+    _syncSub = _dataSyncService?.syncStream.listen((entity) {
+      if (entity == SyncEntity.students) {
+        loadGroups(silent: true);
+      }
+    });
+  }
 
-  Future<void> loadGroups() async {
-    emit(state.copyWith(isLoading: true, error: null));
+  Future<void> loadGroups({bool silent = false}) async {
+    if (!silent) {
+      emit(state.copyWith(isLoading: true, error: null));
+    }
     try {
       final db = await _databaseService.database;
 
@@ -47,19 +63,20 @@ class GroupCubit extends Cubit<GroupState> {
         } catch (_) {}
       }
 
+      // Batch load all group schedules in a single query to eliminate N+1 overhead
+      final allSchedules = await db.query(DBQueries.tableGroupSchedules);
+      final schedulesByGroupId = <dynamic, List<Map<String, dynamic>>>{};
+      for (final s in allSchedules) {
+        final gid = s['group_id'];
+        schedulesByGroupId.putIfAbsent(gid, () => []).add(Map<String, dynamic>.from(s));
+      }
+
       final List<Map<String, dynamic>> groupsWithSchedules = [];
 
       for (final g in groupResults) {
         final mutableGroup = Map<String, dynamic>.from(g);
         final groupId = g['id'];
-
-        // Load schedules for this group
-        final scheduleResults = await db.rawQuery(
-          DBQueries.getGroupSchedulesByGroupId,
-          [groupId],
-        );
-
-        mutableGroup['schedules'] = scheduleResults;
+        mutableGroup['schedules'] = schedulesByGroupId[groupId] ?? const <Map<String, dynamic>>[];
         groupsWithSchedules.add(mutableGroup);
       }
 
@@ -110,7 +127,8 @@ class GroupCubit extends Cubit<GroupState> {
         }
       });
 
-      await loadGroups();
+      await loadGroups(silent: true);
+      _dataSyncService?.notifyGroupsChanged();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
       rethrow;
@@ -148,7 +166,8 @@ class GroupCubit extends Cubit<GroupState> {
         }
       });
 
-      await loadGroups();
+      await loadGroups(silent: true);
+      _dataSyncService?.notifyGroupsChanged();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
       rethrow;
@@ -159,7 +178,8 @@ class GroupCubit extends Cubit<GroupState> {
     try {
       final db = await _databaseService.database;
       await db.delete(DBQueries.tableGroups, where: 'id = ?', whereArgs: [id]);
-      await loadGroups();
+      await loadGroups(silent: true);
+      _dataSyncService?.notifyGroupsChanged();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
@@ -218,7 +238,8 @@ class GroupCubit extends Cubit<GroupState> {
       );
       await loadGroupStudents(groupId);
       await loadAvailableStudents(grade: grade);
-      await loadGroups();
+      await loadGroups(silent: true);
+      _dataSyncService?.notifyGroupsChanged();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
@@ -236,9 +257,16 @@ class GroupCubit extends Cubit<GroupState> {
       );
       await loadGroupStudents(groupId);
       await loadAvailableStudents(grade: grade);
-      await loadGroups();
+      await loadGroups(silent: true);
+      _dataSyncService?.notifyGroupsChanged();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
+  }
+
+  @override
+  Future<void> close() {
+    _syncSub?.cancel();
+    return super.close();
   }
 }

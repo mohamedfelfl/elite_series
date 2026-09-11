@@ -22,6 +22,7 @@ import 'components/lesson_conflict_dialog.dart';
 import 'components/lessons_tab_view.dart';
 import 'components/live_roster_view.dart';
 import 'components/mobile_scanner_view.dart';
+import 'components/student_attendance_search_bar.dart';
 
 @RoutePage()
 class QrScannerScreen extends StatefulWidget {
@@ -34,6 +35,8 @@ class QrScannerScreen extends StatefulWidget {
 class _QrScannerScreenState extends State<QrScannerScreen>
     with SingleTickerProviderStateMixin {
   final _manualController = TextEditingController();
+  final FocusNode _scanFocusNode = FocusNode();
+  final FocusNode _searchFocusNode = FocusNode();
   MobileScannerController? _cameraController;
   late TabController _tabController;
   bool _isDesktop = false;
@@ -42,21 +45,46 @@ class _QrScannerScreenState extends State<QrScannerScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _isDesktop =
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
     if (!_isDesktop) {
-      _cameraController = MobileScannerController();
+      _cameraController = MobileScannerController(
+        formats: const [
+          BarcodeFormat.qrCode,
+          BarcodeFormat.code128,
+        ],
+      );
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<LessonCubit>().loadLessonsForDate(DateTime.now());
+        _requestScanFocus();
+      }
+    });
+  }
+
+  void _onTabChanged() {
+    if (_tabController.index == 0) {
+      _requestScanFocus();
+    }
+  }
+
+  void _requestScanFocus() {
+    if (_searchFocusNode.hasFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scanFocusNode.canRequestFocus) {
+        _scanFocusNode.requestFocus();
       }
     });
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _manualController.dispose();
+    _scanFocusNode.dispose();
+    _searchFocusNode.dispose();
     _cameraController?.dispose();
     _tabController.dispose();
     super.dispose();
@@ -160,6 +188,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                 );
                 _manualController.clear();
                 context.read<LessonCubit>().resetScanState();
+                _requestScanFocus();
               }
               if (state.error != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -170,6 +199,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                   ),
                 );
                 context.read<LessonCubit>().resetScanState();
+                _requestScanFocus();
               }
             },
           ),
@@ -189,6 +219,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                 );
                 _manualController.clear();
                 context.read<AttendanceCubit>().resetScanState();
+                _requestScanFocus();
               }
               if (state.error != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -199,6 +230,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                   ),
                 );
                 context.read<AttendanceCubit>().resetScanState();
+                _requestScanFocus();
               }
             },
           ),
@@ -213,6 +245,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
             LessonsTabView(
               onSwitchToScanner: () {
                 _tabController.animateTo(0);
+                _requestScanFocus();
               },
             ),
           ],
@@ -262,6 +295,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                   } else {
                     context.read<LessonCubit>().setActiveLesson(lesson);
                   }
+                  _requestScanFocus();
                 },
                 onEndLesson: () {
                   if (activeLesson != null) {
@@ -272,6 +306,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                         context.read<LessonCubit>().endLesson(
                               activeLesson.id!,
                             );
+                        _requestScanFocus();
                       },
                     );
                   }
@@ -293,6 +328,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
               if (_isDesktop)
                 DesktopScannerView(
                   manualController: _manualController,
+                  focusNode: _scanFocusNode,
                   onScan: _onScanReceived,
                 )
               else
@@ -302,8 +338,18 @@ class _QrScannerScreenState extends State<QrScannerScreen>
                   onScan: _onScanReceived,
                 ),
 
-              // 3. If there is an active lesson, show Live Roster below scanner
+              // 3. If there is an active lesson, show Quick Student Search and Live Roster below scanner
               if (activeLesson != null) ...[
+                SizedBox(height: 20.h),
+                StudentAttendanceSearchBar(
+                  focusNode: _searchFocusNode,
+                  onMarkPresent: (studentId) {
+                    context.read<LessonCubit>().markStudentPresent(studentId);
+                  },
+                  onSearchCleared: () {
+                    _requestScanFocus();
+                  },
+                ),
                 SizedBox(height: 20.h),
                 Text(
                   LocaleKeys.lesson_summary.tr(),

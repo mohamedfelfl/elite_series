@@ -130,7 +130,10 @@ class ReportCubit extends Cubit<ReportState> {
             pw.SizedBox(height: 16),
             _buildAttendanceSection(attendance),
             pw.SizedBox(height: 16),
-            _buildPaymentSection(payments),
+            _buildPaymentSection(
+              payments,
+              isFree: student['student_status'] == 'free',
+            ),
           ],
         ),
       );
@@ -149,10 +152,32 @@ class ReportCubit extends Cubit<ReportState> {
       final db = await _databaseService.database;
       final String dateStr = date.toIso8601String().split('T').first;
 
-      final results = await db.rawQuery(
+      final paymentRows = await db.rawQuery(
         DBQueries.reportDailyPayments,
         ['$dateStr%'],
       );
+
+      final freeStudentsAttended = await db.rawQuery(
+        '''
+        SELECT DISTINCT s.id as student_id, s.name as student_name, s.serial_number, s.student_status,
+               0.0 as paid_amount, 0.0 as total_amount, a.date as paid_date, 0 as month, 0 as year
+        FROM attendance a
+        JOIN students s ON a.student_id = s.id
+        WHERE a.date = ? AND s.student_status = 'free'
+        ORDER BY s.name ASC
+        ''',
+        [dateStr],
+      );
+
+      final Set<dynamic> existingStudentIds =
+          paymentRows.map((r) => r['student_id']).toSet();
+
+      final List<Map<String, dynamic>> combinedResults = [
+        ...paymentRows.map((r) => Map<String, dynamic>.from(r)),
+        ...freeStudentsAttended
+            .where((r) => !existingStudentIds.contains(r['student_id']))
+            .map((r) => Map<String, dynamic>.from(r)),
+      ];
 
       final pdf = await _createDocument();
       pdf.addPage(
@@ -177,7 +202,7 @@ class ReportCubit extends Cubit<ReportState> {
               ),
             ),
             pw.SizedBox(height: 16),
-            if (results.isEmpty)
+            if (combinedResults.isEmpty)
               pw.Center(
                 child: pw.Text(
                   LocaleKeys.no_payments_today.tr(),
@@ -216,14 +241,31 @@ class ReportCubit extends Cubit<ReportState> {
                   LocaleKeys.paid_amount.tr(),
                   LocaleKeys.time.tr(),
                 ],
-                data: results.map((r) {
-                  final paidDate = DateTime.parse(r['paid_date'].toString());
-                  final timeStr = DateFormat('HH:mm').format(paidDate);
+                data: combinedResults.map((r) {
+                  final bool isFree = r['student_status'] == 'free';
+                  final String studentName = isFree
+                      ? '${r['student_name']} (${LocaleKeys.free_student.tr()})'
+                      : r['student_name'].toString();
+                  final int month = (r['month'] as num?)?.toInt() ?? 0;
+                  final int year = (r['year'] as num?)?.toInt() ?? 0;
+                  final String monthYearStr = isFree && month == 0
+                      ? '-'
+                      : '$month/$year';
+
+                  final String paidAmountStr = isFree
+                      ? '${LocaleKeys.free.tr()} (0.00)'
+                      : '${LocaleKeys.currency_symbol.tr()} ${(r['paid_amount'] as num).toDouble().toStringAsFixed(2)}';
+
+                  final paidDateStr = r['paid_date']?.toString() ?? '';
+                  final String timeStr = paidDateStr.contains('T')
+                      ? DateFormat('HH:mm').format(DateTime.parse(paidDateStr))
+                      : '-';
+
                   return [
-                    r['serial_number'].toString(),
-                    r['student_name'].toString(),
-                    '${r['month']}/${r['year']}',
-                    '${LocaleKeys.currency_symbol.tr()} ${(r['paid_amount'] as num).toDouble().toStringAsFixed(2)}',
+                    r['serial_number']?.toString() ?? '',
+                    studentName,
+                    monthYearStr,
+                    paidAmountStr,
                     timeStr,
                   ];
                 }).toList(),
@@ -231,21 +273,36 @@ class ReportCubit extends Cubit<ReportState> {
               pw.SizedBox(height: 16),
               pw.Divider(),
               pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text(
-                    '${LocaleKeys.total.tr()}: ',
-                    style: pw.TextStyle(
-                      fontSize: 16,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.Text(
-                    '${LocaleKeys.currency_symbol.tr()} ${results.fold(0.0, (sum, r) => sum + (r['paid_amount'] as num).toDouble()).toStringAsFixed(2)}',
-                    style: pw.TextStyle(
-                      fontSize: 16,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
+                  if (combinedResults.any((r) => r['student_status'] == 'free'))
+                    pw.Text(
+                      '${LocaleKeys.free_students_count.tr()}: ${combinedResults.where((r) => r['student_status'] == 'free').length} (${LocaleKeys.exempt_no_payments.tr()})',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.amber900,
+                      ),
+                    )
+                  else
+                    pw.SizedBox(),
+                  pw.Row(
+                    children: [
+                      pw.Text(
+                        '${LocaleKeys.total.tr()}: ',
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Text(
+                        '${LocaleKeys.currency_symbol.tr()} ${combinedResults.fold(0.0, (sum, r) => sum + (r['student_status'] == 'free' ? 0.0 : (r['paid_amount'] as num).toDouble())).toStringAsFixed(2)}',
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -262,12 +319,14 @@ class ReportCubit extends Cubit<ReportState> {
 
   Future<void> generateHighestMarksReport({
     int? examId,
+    List<int>? examIds,
     int? groupId,
     int? limit,
     double? minScore,
     double? maxScore,
     DateTime? fromDate,
     DateTime? toDate,
+    bool fullMarkOnly = false,
   }) async {
     if (state.isLoading) return;
     emit(const ReportState(isLoading: true));
@@ -276,21 +335,37 @@ class ReportCubit extends Cubit<ReportState> {
       final conditions = <String>[];
       final args = <dynamic>[];
 
-      if (examId != null) {
-        conditions.add('m.exam_id = ?');
-        args.add(examId);
+      final effectiveExamIds = <int>{
+        ?examId,
+        ...?examIds,
+      }.toList();
+
+      if (effectiveExamIds.isNotEmpty) {
+        if (effectiveExamIds.length == 1) {
+          conditions.add('m.exam_id = ?');
+          args.add(effectiveExamIds.first);
+        } else {
+          conditions.add(
+            'm.exam_id IN (${List.filled(effectiveExamIds.length, '?').join(', ')})',
+          );
+          args.addAll(effectiveExamIds);
+        }
       }
       if (groupId != null) {
         conditions.add('s.group_id = ?');
         args.add(groupId);
       }
-      if (minScore != null) {
-        conditions.add('m.score >= ?');
-        args.add(minScore);
-      }
-      if (maxScore != null) {
-        conditions.add('m.score <= ?');
-        args.add(maxScore);
+      if (fullMarkOnly) {
+        conditions.add('m.score >= e.full_mark');
+      } else {
+        if (minScore != null) {
+          conditions.add('m.score >= ?');
+          args.add(minScore);
+        }
+        if (maxScore != null) {
+          conditions.add('m.score <= ?');
+          args.add(maxScore);
+        }
       }
       if (fromDate != null) {
         conditions.add('e.date >= ?');
@@ -308,15 +383,27 @@ class ReportCubit extends Cubit<ReportState> {
       String query = '''
         ${DBQueries.reportHighestMarksBase}
         $whereClause
-        ORDER BY m.score DESC
+        ORDER BY (CAST(m.score AS REAL) / e.full_mark) DESC, m.score DESC, s.name ASC
       ''';
 
-      if (limit != null) {
+      if (!fullMarkOnly && limit != null) {
         query += '\n        LIMIT ?';
         args.add(limit);
       }
 
       final results = await db.rawQuery(query, args);
+
+      String? examsSubtitle;
+      if (effectiveExamIds.isNotEmpty) {
+        final examRows = await db.rawQuery(
+          'SELECT name FROM exams WHERE id IN (${List.filled(effectiveExamIds.length, '?').join(', ')})',
+          effectiveExamIds,
+        );
+        final names = examRows.map((r) => r['name'].toString()).toList();
+        if (names.isNotEmpty) {
+          examsSubtitle = '${LocaleKeys.exams.tr()}: ${names.join(' - ')}';
+        }
+      }
 
       final pdf = await _createDocument();
       pdf.addPage(
@@ -327,13 +414,25 @@ class ReportCubit extends Cubit<ReportState> {
             pw.Header(
               level: 0,
               child: pw.Text(
-                LocaleKeys.highest_marks_report_title.tr(),
+                fullMarkOnly
+                    ? LocaleKeys.full_mark_students_report_title.tr()
+                    : LocaleKeys.highest_marks_report_title.tr(),
                 style: pw.TextStyle(
                   fontSize: 22,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
             ),
+            if (examsSubtitle != null) ...[
+              pw.SizedBox(height: 4),
+              pw.Text(
+                examsSubtitle,
+                style: const pw.TextStyle(
+                  fontSize: 12,
+                  color: PdfColors.blueGrey700,
+                ),
+              ),
+            ],
             pw.SizedBox(height: 12),
             pw.TableHelper.fromTextArray(
               tableDirection: _textDirection,
@@ -485,6 +584,7 @@ class ReportCubit extends Cubit<ReportState> {
                   LocaleKeys.notes.tr(),
                 ],
                 data: results.map((r) {
+                  final bool isFree = r['student_status'] == 'free';
                   final status = r['status']?.toString() ?? '';
                   final notes = r['notes']?.toString() ?? '';
                   final displayStatus =
@@ -493,13 +593,21 @@ class ReportCubit extends Cubit<ReportState> {
                           : (status == 'missed'
                               ? LocaleKeys.absent.tr()
                               : LocaleKeys.other_lesson.tr());
+                  final studentName = isFree
+                      ? '${r['student_name']} (${LocaleKeys.free_student.tr()})'
+                      : r['student_name'].toString();
+                  final displayNotes = isFree
+                      ? (notes.isNotEmpty
+                          ? '$notes - ${LocaleKeys.exempt_no_payments.tr()}'
+                          : LocaleKeys.exempt_no_payments.tr())
+                      : notes;
                   return [
                     r['date'].toString(),
                     r['serial_number'].toString(),
-                    r['student_name'].toString(),
+                    studentName,
                     r['group_name']?.toString() ?? LocaleKeys.na.tr(),
                     displayStatus,
-                    notes,
+                    displayNotes,
                   ];
                 }).toList(),
               ),
@@ -557,6 +665,25 @@ class ReportCubit extends Cubit<ReportState> {
                 child: pw.Text(
                   '${LocaleKeys.phone.tr()}: ${student['phone1'] ?? '-'}',
                   style: const pw.TextStyle(fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Row(
+            children: [
+              pw.Expanded(
+                child: pw.Text(
+                  '${LocaleKeys.student_status.tr()}: ${student['student_status'] == 'free' ? LocaleKeys.exempt_no_payments.tr() : LocaleKeys.normal.tr()}',
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: student['student_status'] == 'free'
+                        ? pw.FontWeight.bold
+                        : pw.FontWeight.normal,
+                    color: student['student_status'] == 'free'
+                        ? PdfColors.amber900
+                        : null,
+                  ),
                 ),
               ),
             ],
@@ -690,7 +817,42 @@ class ReportCubit extends Cubit<ReportState> {
     );
   }
 
-  pw.Widget _buildPaymentSection(List<Map<String, dynamic>> payments) {
+  pw.Widget _buildPaymentSection(
+    List<Map<String, dynamic>> payments, {
+    bool isFree = false,
+  }) {
+    if (isFree) {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            LocaleKeys.payment_history.tr(),
+            style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: const pw.BoxDecoration(
+              color: PdfColors.amber50,
+              borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Row(
+              children: [
+                pw.Text(
+                  LocaleKeys.exempt_no_payments.tr(),
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.amber900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -768,6 +930,27 @@ class ReportCubit extends Cubit<ReportState> {
         [groupId, minVal, maxVal],
       );
 
+      final freeStudentsInGroup = await db.rawQuery(
+        '''
+        SELECT s.id as student_id, s.name as student_name, s.serial_number, s.student_status,
+               0.0 as total_amount, 0.0 as paid_amount, 0 as month, 0 as year
+        FROM students s
+        WHERE s.group_id = ? AND s.student_status = 'free'
+        ORDER BY s.name ASC
+        ''',
+        [groupId],
+      );
+
+      final Set<dynamic> existingStudentIds =
+          results.map((r) => r['student_id']).toSet();
+
+      final List<Map<String, dynamic>> combinedGroupPayments = [
+        ...results.map((r) => Map<String, dynamic>.from(r)),
+        ...freeStudentsInGroup
+            .where((r) => !existingStudentIds.contains(r['student_id']))
+            .map((r) => Map<String, dynamic>.from(r)),
+      ];
+
       final pdf = await _createDocument();
       pdf.addPage(
         pw.MultiPage(
@@ -791,7 +974,7 @@ class ReportCubit extends Cubit<ReportState> {
               ),
             ),
             pw.SizedBox(height: 12),
-            if (results.isEmpty)
+            if (combinedGroupPayments.isEmpty)
               pw.Center(
                 child: pw.Text(
                   LocaleKeys.no_payments_period.tr(),
@@ -832,37 +1015,76 @@ class ReportCubit extends Cubit<ReportState> {
                   LocaleKeys.paid.tr(),
                   LocaleKeys.remaining.tr(),
                 ],
-                data: results.map((r) {
-                  final total = (r['total_amount'] as num).toDouble();
-                  final paid = (r['paid_amount'] as num).toDouble();
+                data: combinedGroupPayments.map((r) {
+                  final bool isFree = r['student_status'] == 'free';
+                  final String studentName = isFree
+                      ? '${r['student_name']} (${LocaleKeys.free_student.tr()})'
+                      : r['student_name'].toString();
+                  final int month = (r['month'] as num?)?.toInt() ?? 0;
+                  final int year = (r['year'] as num?)?.toInt() ?? 0;
+                  final String monthYearStr = isFree && month == 0
+                      ? '-'
+                      : '$month/$year';
+
+                  final double total =
+                      (r['total_amount'] as num?)?.toDouble() ?? 0.0;
+                  final double paid =
+                      (r['paid_amount'] as num?)?.toDouble() ?? 0.0;
+
+                  final String totalStr = isFree
+                      ? '0.00'
+                      : '${LocaleKeys.currency_symbol.tr()} ${total.toStringAsFixed(2)}';
+                  final String paidStr = isFree
+                      ? '${LocaleKeys.free.tr()} (0.00)'
+                      : '${LocaleKeys.currency_symbol.tr()} ${paid.toStringAsFixed(2)}';
+                  final String remainingStr = isFree
+                      ? '0.00 (${LocaleKeys.free.tr()})'
+                      : '${LocaleKeys.currency_symbol.tr()} ${(total - paid).toStringAsFixed(2)}';
+
                   return [
-                    r['serial_number'].toString(),
-                    r['student_name'].toString(),
-                    '${r['month']}/${r['year']}',
-                    '${LocaleKeys.currency_symbol.tr()} ${total.toStringAsFixed(2)}',
-                    '${LocaleKeys.currency_symbol.tr()} ${paid.toStringAsFixed(2)}',
-                    '${LocaleKeys.currency_symbol.tr()} ${(total - paid).toStringAsFixed(2)}',
+                    r['serial_number']?.toString() ?? '',
+                    studentName,
+                    monthYearStr,
+                    totalStr,
+                    paidStr,
+                    remainingStr,
                   ];
                 }).toList(),
               ),
               pw.SizedBox(height: 16),
               pw.Divider(),
               pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text(
-                    '${LocaleKeys.total.tr()}: ',
-                    style: pw.TextStyle(
-                      fontSize: 16,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.Text(
-                    '${LocaleKeys.currency_symbol.tr()} ${results.fold(0.0, (sum, r) => sum + (r['paid_amount'] as num).toDouble()).toStringAsFixed(2)}',
-                    style: pw.TextStyle(
-                      fontSize: 16,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
+                  if (combinedGroupPayments
+                      .any((r) => r['student_status'] == 'free'))
+                    pw.Text(
+                      '${LocaleKeys.free_students_count.tr()}: ${combinedGroupPayments.where((r) => r['student_status'] == 'free').length} (${LocaleKeys.exempt_no_payments.tr()})',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.amber900,
+                      ),
+                    )
+                  else
+                    pw.SizedBox(),
+                  pw.Row(
+                    children: [
+                      pw.Text(
+                        '${LocaleKeys.total.tr()}: ',
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Text(
+                        '${LocaleKeys.currency_symbol.tr()} ${combinedGroupPayments.fold(0.0, (sum, r) => sum + (r['student_status'] == 'free' ? 0.0 : (r['paid_amount'] as num).toDouble())).toStringAsFixed(2)}',
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1093,9 +1315,13 @@ class ReportCubit extends Cubit<ReportState> {
               ],
               data: students.map((s) {
                 final sId = s['id'] as int;
+                final bool isFree = s['student_status'] == 'free';
+                final String studentName = isFree
+                    ? '${s['name']} (${LocaleKeys.free_student.tr()})'
+                    : s['name'].toString();
                 return [
                   s['serial_number'].toString(),
-                  s['name'].toString(),
+                  studentName,
                   ...notes.map((n) {
                     final nId = n['id'] as int;
                     final key = '${sId}_$nId';
@@ -1288,19 +1514,28 @@ class ReportCubit extends Cubit<ReportState> {
                 data: attendanceRows.asMap().entries.map((entry) {
                   final idx = entry.key + 1;
                   final r = entry.value;
+                  final bool isFree = r['student_status'] == 'free';
                   final status = r['status']?.toString() ?? '';
                   final displayStatus = status == 'attended'
                       ? LocaleKeys.present.tr()
                       : (status == 'otherLesson'
                           ? LocaleKeys.other_lesson.tr()
                           : LocaleKeys.absent.tr());
+                  final studentName = isFree
+                      ? '${r['student_name']} (${LocaleKeys.free_student.tr()})'
+                      : (r['student_name']?.toString() ?? '');
+                  final displayNotes = isFree
+                      ? ((r['notes']?.toString() ?? '').isNotEmpty
+                          ? '${r['notes']} - ${LocaleKeys.exempt_no_payments.tr()}'
+                          : LocaleKeys.exempt_no_payments.tr())
+                      : (r['notes']?.toString() ?? '');
                   return [
                     idx.toString(),
                     r['serial_number']?.toString() ?? '',
-                    r['student_name']?.toString() ?? '',
+                    studentName,
                     r['group_name']?.toString() ?? '',
                     displayStatus,
-                    r['notes']?.toString() ?? '',
+                    displayNotes,
                   ];
                 }).toList(),
               ),
@@ -1386,16 +1621,22 @@ class ReportCubit extends Cubit<ReportState> {
                 data: absentStudents.asMap().entries.map((entry) {
                   final idx = entry.key + 1;
                   final s = entry.value;
+                  final bool isFree = s['student_status'] == 'free';
+                  final studentName = isFree
+                      ? '${s['name']} (${LocaleKeys.free_student.tr()})'
+                      : (s['name']?.toString() ?? '');
+                  final notes =
+                      isFree ? LocaleKeys.exempt_no_payments.tr() : '';
                   final p1 = s['phone1']?.toString() ?? '';
                   final p2 = s['phone2']?.toString() ?? '';
                   return [
                     idx.toString(),
                     s['serial_number']?.toString() ?? '',
-                    s['name']?.toString() ?? '',
+                    studentName,
                     p1,
                     p2,
                     s['father_job']?.toString() ?? '',
-                    '',
+                    notes,
                   ];
                 }).toList(),
               ),
@@ -1513,16 +1754,22 @@ class ReportCubit extends Cubit<ReportState> {
                 data: absentStudents.asMap().entries.map((entry) {
                   final idx = entry.key + 1;
                   final s = entry.value;
+                  final bool isFree = s['student_status'] == 'free';
+                  final studentName = isFree
+                      ? '${s['name']} (${LocaleKeys.free_student.tr()})'
+                      : (s['name']?.toString() ?? '');
+                  final notes =
+                      isFree ? LocaleKeys.exempt_no_payments.tr() : '';
                   final p1 = s['phone1']?.toString() ?? '';
                   final p2 = s['phone2']?.toString() ?? '';
                   return [
                     idx.toString(),
                     s['serial_number']?.toString() ?? '',
-                    s['name']?.toString() ?? '',
+                    studentName,
                     p1,
                     p2,
                     s['father_job']?.toString() ?? '',
-                    '',
+                    notes,
                   ];
                 }).toList(),
               ),

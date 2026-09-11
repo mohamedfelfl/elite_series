@@ -268,17 +268,19 @@ class BackupService {
 
     final buffer = StringBuffer();
     buffer.writeln(
-      'Student Name,Serial Number,Month,Year,Total Amount,Paid Amount,Paid Date',
+      'Student Name,Serial Number,Student Status,Month,Year,Total Amount,Paid Amount,Paid Date',
     );
 
     for (final row in rows) {
+      final isFree = (row['student_status'] ?? '').toString().toLowerCase() == 'free';
       buffer.writeln(
         '"${row['student_name']}",'
         '"${row['serial_number']}",'
+        '"${row['student_status'] ?? ''}",'
         '${row['month']},'
         '${row['year']},'
-        '${row['total_amount']},'
-        '${row['paid_amount']},'
+        '${isFree ? 0.0 : row['total_amount']},'
+        '${isFree ? 0.0 : row['paid_amount']},'
         '"${row['paid_date'] ?? ''}"',
       );
     }
@@ -293,7 +295,7 @@ class BackupService {
 
     final buffer = StringBuffer();
     buffer.writeln(
-      'Date,Lesson Time,Lesson Group,Student Serial,Student Name,Student Group,Status,Notes',
+      'Date,Lesson Time,Lesson Group,Student Serial,Student Name,Student Group,Student Status,Status,Notes',
     );
 
     for (final row in rows) {
@@ -304,6 +306,7 @@ class BackupService {
         '"${row['serial_number'] ?? ''}",'
         '"${row['student_name'] ?? ''}",'
         '"${row['student_group'] ?? ''}",'
+        '"${row['student_status'] ?? ''}",'
         '"${row['status'] ?? ''}",'
         '"${row['notes'] ?? ''}"',
       );

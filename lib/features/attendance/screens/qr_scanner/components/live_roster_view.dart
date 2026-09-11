@@ -157,6 +157,8 @@ class _LiveRosterViewState extends State<LiveRosterView>
 
     final Color badgeColor = isOwnGroup ? Colors.green : Colors.orange;
 
+    final bool isFree = record['student_status']?.toString() == 'free';
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppDimens.p16,
@@ -181,11 +183,39 @@ class _LiveRosterViewState extends State<LiveRosterView>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (isFree) ...[
+                      SizedBox(width: AppDimens.w6),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppDimens.w8,
+                          vertical: AppDimens.h2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade100,
+                          borderRadius: BorderRadius.circular(AppDimens.r8),
+                          border: Border.all(color: Colors.amber.shade700),
+                        ),
+                        child: Text(
+                          LocaleKeys.free_student.tr(),
+                          style: TextStyle(
+                            color: Colors.amber.shade900,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 if (serial.isNotEmpty) ...[
                   SizedBox(height: 2.h),
@@ -241,6 +271,8 @@ class _LiveRosterViewState extends State<LiveRosterView>
     final String phone1 = student['phone1']?.toString() ?? '';
     final int studentId = (student['id'] as int?) ?? 0;
 
+    final bool isFree = student['student_status']?.toString() == 'free';
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppDimens.p16,
@@ -265,11 +297,39 @@ class _LiveRosterViewState extends State<LiveRosterView>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (isFree) ...[
+                      SizedBox(width: AppDimens.w6),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppDimens.w8,
+                          vertical: AppDimens.h2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade100,
+                          borderRadius: BorderRadius.circular(AppDimens.r8),
+                          border: Border.all(color: Colors.amber.shade700),
+                        ),
+                        child: Text(
+                          LocaleKeys.free_student.tr(),
+                          style: TextStyle(
+                            color: Colors.amber.shade900,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 Row(
                   children: [

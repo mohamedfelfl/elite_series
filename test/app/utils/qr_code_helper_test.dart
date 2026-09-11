@@ -71,5 +71,33 @@ void main() {
       expect(QrCodeHelper.extractSerialNumber('CUSTOM-999'), 'CUSTOM-999');
       expect(QrCodeHelper.extractSerialNumber('stu_12345'), 'stu_12345');
     });
+
+    test('hasCompleteSerial detects completed serial numbers accurately', () {
+      // Complete standard format
+      expect(QrCodeHelper.hasCompleteSerial('EL-01-00003'), isTrue);
+      expect(QrCodeHelper.hasCompleteSerial('EL-02-00045'), isTrue);
+      expect(QrCodeHelper.hasCompleteSerial('ELITE|stu_123|EL-01-00003'), isTrue);
+
+      // Complete legacy format
+      expect(QrCodeHelper.hasCompleteSerial('EL-000001'), isTrue);
+
+      // Incomplete / partial strings
+      expect(QrCodeHelper.hasCompleteSerial('EL-01-'), isFalse);
+      expect(QrCodeHelper.hasCompleteSerial('EL-01-000'), isFalse);
+      expect(QrCodeHelper.hasCompleteSerial('EL-'), isFalse);
+      expect(QrCodeHelper.hasCompleteSerial('EL'), isFalse);
+      expect(QrCodeHelper.hasCompleteSerial(''), isFalse);
+      expect(QrCodeHelper.hasCompleteSerial(null), isFalse);
+      expect(QrCodeHelper.hasCompleteSerial('random text'), isFalse);
+    });
+
+    test('extractAllCandidates extracts serial, legacy ids, and segments in priority order', () {
+      final candidates = QrCodeHelper.extractAllCandidates(
+        'ELITE|stu_bd02c7b92a2b49da8a|EL-01-00003',
+      );
+      expect(candidates, contains('EL-01-00003'));
+      expect(candidates, contains('stu_bd02c7b92a2b49da8a'));
+      expect(candidates.first, equals('EL-01-00003'));
+    });
   });
 }

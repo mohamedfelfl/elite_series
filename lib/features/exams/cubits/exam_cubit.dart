@@ -170,8 +170,10 @@ class ExamCubit extends Cubit<ExamState> {
     DateTime? startDate,
     DateTime? endDate,
     int? examId,
+    List<int>? examIds,
     int? groupId,
     int? limit,
+    bool fullMarkOnly = false,
   }) async {
     try {
       final Database db = await _databaseService.database;
@@ -185,9 +187,22 @@ class ExamCubit extends Cubit<ExamState> {
           endDate.toIso8601String().split('T').first,
         ]);
       }
-      if (examId != null) {
-        conditions.add(DBQueries.examIdCondition);
-        args.add(examId);
+
+      final effectiveExamIds = <int>{
+        ?examId,
+        ...?examIds,
+      }.toList();
+
+      if (effectiveExamIds.isNotEmpty) {
+        if (effectiveExamIds.length == 1) {
+          conditions.add(DBQueries.examIdCondition);
+          args.add(effectiveExamIds.first);
+        } else {
+          conditions.add(
+            'e.id IN (${List.filled(effectiveExamIds.length, '?').join(', ')})',
+          );
+          args.addAll(effectiveExamIds);
+        }
       }
 
       String joinClause = DBQueries.getTopStudentsJoin;
@@ -195,10 +210,10 @@ class ExamCubit extends Cubit<ExamState> {
       if (groupId != null) {
         conditions.add(DBQueries.studentGroupCondition);
         args.add(groupId);
- 
-        // If filtering by group but not a specific exam,
+
+        // If filtering by group but not specific exams,
         // restrict results to exams explicitly assigned to this group via exam_groups.
-        if (examId == null) {
+        if (effectiveExamIds.isEmpty) {
           joinClause += '\n        ${DBQueries.examGroupJoinFragment}';
         }
       }
@@ -207,16 +222,20 @@ class ExamCubit extends Cubit<ExamState> {
           ? 'WHERE ${conditions.join(' AND ')}'
           : '';
 
-      String query =
-          '''
+      final String havingClause = fullMarkOnly
+          ? 'HAVING SUM(m.score) >= SUM(e.full_mark)'
+          : '';
+
+      String query = '''
         ${DBQueries.getTopStudentsSelect}
         $joinClause
         $whereClause
         GROUP BY s.id
-        ORDER BY totalMarks DESC
+        $havingClause
+        ORDER BY (SUM(m.score) * 1.0 / SUM(e.full_mark)) DESC, totalMarks DESC
       ''';
 
-      if (limit != null) {
+      if (!fullMarkOnly && limit != null) {
         query += '\n        LIMIT ?';
         args.add(limit);
       }
@@ -365,7 +384,12 @@ class ExamCubit extends Cubit<ExamState> {
   }
 
   /// Batch save marks for multiple students in an exam.
-  Future<void> saveMarks(int examId, Map<int, double> studentScores) async {
+  /// Any student IDs in [clearedStudentIds] will have their marks removed (becoming ungraded).
+  Future<void> saveMarks(
+    int examId,
+    Map<int, double> studentScores, {
+    List<int>? clearedStudentIds,
+  }) async {
     try {
       final Database db = await _databaseService.database;
       final Batch batch = db.batch();
@@ -375,6 +399,15 @@ class ExamCubit extends Cubit<ExamState> {
           'student_id': entry.key,
           'score': entry.value,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      if (clearedStudentIds != null && clearedStudentIds.isNotEmpty) {
+        for (final int sId in clearedStudentIds) {
+          batch.delete(
+            DBQueries.tableMarks,
+            where: 'exam_id = ? AND student_id = ?',
+            whereArgs: [examId, sId],
+          );
+        }
       }
       await batch.commit(noResult: true);
       await loadMarks(examId);
@@ -387,10 +420,12 @@ class ExamCubit extends Cubit<ExamState> {
 
   /// Batch save marks without triggering state reloads.
   /// Used when saving before navigating away to avoid state churn.
+  /// Any student IDs in [clearedStudentIds] will have their marks removed.
   Future<void> saveMarksQuietly(
     int examId,
-    Map<int, double> studentScores,
-  ) async {
+    Map<int, double> studentScores, {
+    List<int>? clearedStudentIds,
+  }) async {
     try {
       final Database db = await _databaseService.database;
       final Batch batch = db.batch();
@@ -401,7 +436,43 @@ class ExamCubit extends Cubit<ExamState> {
           'score': entry.value,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
+      if (clearedStudentIds != null && clearedStudentIds.isNotEmpty) {
+        for (final int sId in clearedStudentIds) {
+          batch.delete(
+            DBQueries.tableMarks,
+            where: 'exam_id = ? AND student_id = ?',
+            whereArgs: [examId, sId],
+          );
+        }
+      }
       await batch.commit(noResult: true);
+      final List<Map<String, Object?>> results = await db.rawQuery(
+        DBQueries.loadMarksBase,
+        <Object?>[examId],
+      );
+      emit(state.copyWith(marks: results));
+      await calculateAverageScore();
+      await getTopStudents();
+    } catch (e) {
+      emit(state.copyWith(error: e.toString()));
+    }
+  }
+
+  /// Delete a mark for a specific student in an exam.
+  Future<void> deleteMark({
+    required int examId,
+    required int studentId,
+  }) async {
+    try {
+      final Database db = await _databaseService.database;
+      await db.delete(
+        DBQueries.tableMarks,
+        where: 'exam_id = ? AND student_id = ?',
+        whereArgs: [examId, studentId],
+      );
+      await loadMarks(examId);
+      await calculateAverageScore();
+      await getTopStudents();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }

@@ -11,8 +11,10 @@ import '../../../auth/cubits/auth_cubit.dart';
 import '../../../auth/models/user.dart';
 import '../../../payments/cubits/payment_cubit.dart';
 import '../../../attendance/cubits/attendance_cubit.dart';
+import '../../../exams/cubits/exam_cubit.dart';
 import 'tabs/attendance_tab.dart';
 import 'tabs/info_tab.dart';
+import 'tabs/marks_tab.dart';
 import 'tabs/payments_tab.dart';
 
 @RoutePage()
@@ -40,7 +42,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
     );
     _canManagePayments = user?.can(UserPermission.managePayments) ?? false;
     _tabController = TabController(
-      length: _canManagePayments ? 3 : 2,
+      length: _canManagePayments ? 4 : 3,
       vsync: this,
     );
     _loadData();
@@ -57,6 +59,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
         context.read<PaymentCubit>().loadPayments(widget.id);
       }
       context.read<AttendanceCubit>().loadAttendance(widget.id);
+      context.read<ExamCubit>().loadStudentMarks(widget.id);
     }
   }
 
@@ -148,6 +151,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
               Tab(text: LocaleKeys.info.tr()),
               if (_canManagePayments) Tab(text: LocaleKeys.tab_payments.tr()),
               Tab(text: LocaleKeys.tab_attendance.tr()),
+              Tab(text: LocaleKeys.tab_marks.tr()),
             ],
           ),
 
@@ -163,7 +167,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                     studentStatus:
                         _student!['student_status']?.toString() ?? 'normal',
                   ),
-                AttendanceTab(studentId: widget.id),
+                AttendanceTab(
+                  studentId: widget.id,
+                  studentStatus:
+                      _student!['student_status']?.toString() ?? 'normal',
+                ),
+                MarksTab(studentId: widget.id, onRefresh: _loadData),
               ],
             ),
           ),

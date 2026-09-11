@@ -96,19 +96,27 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                         return const Center(child: CircularProgressIndicator());
                       }
 
-                      // Calculate totals from student's payments
-                      final totals = _calculateTotals(state.payments);
+                      final bool isFree =
+                          _selectedStudent!['student_status'] == 'free';
 
-                      final List<Map<String, dynamic>>
-                      filteredPayments = _filterPayments(state.payments);
+                      // Calculate totals from student's payments (zero dues for free students)
+                      final totals = isFree
+                          ? _PaymentTotals(
+                              totalPaid: 0.0,
+                              totalDue: 0.0,
+                              remaining: 0.0,
+                              monthlyDue: const {},
+                              monthlyPaid: const {},
+                            )
+                          : _calculateTotals(state.payments);
+
+                      final List<Map<String, dynamic>> filteredPayments =
+                          _filterPayments(state.payments);
 
                       final double progress = totals.totalDue > 0
                           ? (totals.totalPaid / totals.totalDue)
                               .clamp(0.0, 1.0)
                           : 0.0;
-
-                      final bool isFree =
-                          _selectedStudent!['student_status'] == 'free';
 
                       return RefreshIndicator(
                         onRefresh: () => context

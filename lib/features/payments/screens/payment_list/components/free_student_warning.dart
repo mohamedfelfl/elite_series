@@ -10,16 +10,15 @@ class FreeStudentWarning extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
       padding: EdgeInsets.all(24.r),
       decoration: BoxDecoration(
-        color: colorScheme.errorContainer.withValues(alpha: 0.8),
+        color: Colors.amber.shade50,
         borderRadius: BorderRadius.circular(24.r),
         border: Border.all(
-          color: colorScheme.error.withValues(alpha: 0.3),
+          color: Colors.amber.shade300,
         ),
       ),
       child: Row(
@@ -27,23 +26,35 @@ class FreeStudentWarning extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(12.r),
             decoration: BoxDecoration(
-              color: colorScheme.error.withValues(alpha: 0.2),
+              color: Colors.amber.shade100,
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.info_outline,
-              color: colorScheme.error,
+              Icons.card_giftcard_rounded,
+              color: Colors.amber.shade800,
               size: 28.r,
             ),
           ),
           SizedBox(width: 16.w),
           Expanded(
-            child: Text(
-              LocaleKeys.payment_disabled_free_student.tr(),
-              style: textTheme.titleMedium?.copyWith(
-                color: colorScheme.onErrorContainer,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  LocaleKeys.exempt_no_payments.tr(),
+                  style: textTheme.titleMedium?.copyWith(
+                    color: Colors.amber.shade900,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  LocaleKeys.payment_disabled_free_student.tr(),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: Colors.amber.shade800,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

@@ -249,6 +249,12 @@ class DBQueries {
       'CREATE INDEX IF NOT EXISTS idx_lessons_status ON lessons(status)';
   static const String createIdxAttendanceLesson =
       'CREATE INDEX IF NOT EXISTS idx_attendance_lesson ON attendance(lesson_id)';
+  static const String createIdxStudentsSerial =
+      'CREATE INDEX IF NOT EXISTS idx_students_serial ON students(serial_number)';
+  static const String createIdxStudentsName =
+      'CREATE INDEX IF NOT EXISTS idx_students_name ON students(name)';
+  static const String createIdxAttendanceLessonStudent =
+      'CREATE INDEX IF NOT EXISTS idx_attendance_lesson_student ON attendance(lesson_id, student_id)';
 
   // ---------------------------------------------------------------------------
   // DDL Queries - Alter Tables
@@ -270,6 +276,8 @@ class DBQueries {
       "ALTER TABLE students ADD COLUMN notes TEXT NOT NULL DEFAULT ''";
   static const String alterAttendanceAddLessonId =
       'ALTER TABLE attendance ADD COLUMN lesson_id INTEGER';
+  static const String alterLessonsAddCreatedAt =
+      'ALTER TABLE lessons ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP';
 
   // ---------------------------------------------------------------------------
   // Auth Queries
@@ -342,7 +350,7 @@ class DBQueries {
         ORDER BY year DESC, month DESC
   ''';
   static const String reportDailyPayments = '''
-        SELECT p.*, s.name as student_name, s.serial_number
+        SELECT p.*, s.name as student_name, s.serial_number, s.student_status
         FROM payments p
         JOIN students s ON p.student_id = s.id
         WHERE p.paid_date LIKE ?
@@ -356,14 +364,14 @@ class DBQueries {
         JOIN exams e ON m.exam_id = e.id
   ''';
   static const String reportAttendanceBase = '''
-        SELECT a.date, a.status, a.notes, s.name as student_name, s.serial_number, g.name as group_name
+        SELECT a.date, a.status, a.notes, s.name as student_name, s.serial_number, s.student_status, g.name as group_name
         FROM attendance a
         JOIN students s ON a.student_id = s.id
         LEFT JOIN groups g ON s.group_id = g.id
   ''';
 
   static const String reportGroupPayments = '''
-        SELECT p.*, s.name as student_name, s.serial_number
+        SELECT p.*, s.name as student_name, s.serial_number, s.student_status
         FROM payments p
         JOIN students s ON p.student_id = s.id
         WHERE s.group_id = ?
@@ -500,7 +508,7 @@ class DBQueries {
   ''';
 
   static const String loadLessonAttendance = '''
-        SELECT a.*, s.name as student_name, s.serial_number, s.phone1, s.phone2, s.father_job, g.name as group_name
+        SELECT a.*, s.name as student_name, s.serial_number, s.phone1, s.phone2, s.father_job, s.student_status, g.name as group_name
         FROM attendance a
         JOIN students s ON a.student_id = s.id
         LEFT JOIN groups g ON s.group_id = g.id
@@ -565,7 +573,7 @@ class DBQueries {
   // ---------------------------------------------------------------------------
 
   static const String loadDailyPaymentsBase = '''
-        SELECT p.*, s.name as student_name
+        SELECT p.*, s.name as student_name, s.serial_number, s.student_status
         FROM payments p
         JOIN students s ON p.student_id = s.id
         WHERE p.paid_date LIKE ?
@@ -584,7 +592,7 @@ class DBQueries {
   ''';
 
   static const String exportPaymentsCsv = '''
-        SELECT p.*, s.name as student_name, s.serial_number 
+        SELECT p.*, s.name as student_name, s.serial_number, s.student_status 
         FROM payments p 
         JOIN students s ON p.student_id = s.id 
         ORDER BY p.year DESC, p.month DESC
@@ -593,7 +601,7 @@ class DBQueries {
   static const String exportAttendanceCsv = '''
         SELECT a.date, l.start_time as lesson_time, lg.name as lesson_group,
                s.serial_number, s.name as student_name, sg.name as student_group,
-               a.status, a.notes
+               a.status, a.notes, s.student_status
         FROM attendance a
         JOIN students s ON a.student_id = s.id
         LEFT JOIN groups sg ON s.group_id = sg.id

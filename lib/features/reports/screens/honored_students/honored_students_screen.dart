@@ -7,6 +7,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../generated/locale_keys.g.dart';
 import '../../../exams/cubits/exam_cubit.dart';
 import '../../../exams/models/student_exam_result.dart';
+import '../../../exams/widgets/multi_exam_selector.dart';
 
 @RoutePage()
 class HonoredStudentsScreen extends StatefulWidget {
@@ -17,15 +18,17 @@ class HonoredStudentsScreen extends StatefulWidget {
 }
 
 enum FilterType { exam, group }
+enum HonorMarksMode { highestMarks, fullMark }
 
 class _HonoredStudentsScreenState extends State<HonoredStudentsScreen> {
   FilterType _filterType = FilterType.exam;
-  int? _selectedExamId;
+  HonorMarksMode _marksMode = HonorMarksMode.highestMarks;
+  Set<int> _selectedExamIds = {};
   int? _selectedGroupId;
   int _limit = 10;
   late ExamCubit _examCubit;
 
-  final List<int> _limitOptions = [3, 5, 10, 20, 50, 100];
+  final List<int> _limitOptions = [3, 5, 10, 20, 50, 100, 500, 1000, 2000];
 
   @override
   void didChangeDependencies() {
@@ -49,10 +52,20 @@ class _HonoredStudentsScreenState extends State<HonoredStudentsScreen> {
   }
 
   void _fetchData() {
+    final hasSelection = _filterType == FilterType.exam
+        ? _selectedExamIds.isNotEmpty
+        : _selectedGroupId != null;
+
+    if (!hasSelection) {
+      _examCubit.resetTopStudents();
+      return;
+    }
+
     _examCubit.getTopStudents(
-      examId: _selectedExamId,
-      groupId: _selectedGroupId,
-      limit: _limit,
+      examIds: _filterType == FilterType.exam ? _selectedExamIds.toList() : null,
+      groupId: _filterType == FilterType.group ? _selectedGroupId : null,
+      limit: _marksMode == HonorMarksMode.fullMark ? null : _limit,
+      fullMarkOnly: _marksMode == HonorMarksMode.fullMark,
     );
   }
 
@@ -78,8 +91,9 @@ class _HonoredStudentsScreenState extends State<HonoredStudentsScreen> {
           : null,
       body: BlocBuilder<ExamCubit, ExamState>(
         builder: (context, state) {
-          final hasSelection =
-              _selectedExamId != null || _selectedGroupId != null;
+          final hasSelection = _filterType == FilterType.exam
+              ? _selectedExamIds.isNotEmpty
+              : _selectedGroupId != null;
 
           return CustomScrollView(
             slivers: [
@@ -111,7 +125,7 @@ class _HonoredStudentsScreenState extends State<HonoredStudentsScreen> {
                         SizedBox(height: 16.h),
                         Text(
                           _filterType == FilterType.exam
-                              ? LocaleKeys.select_exam_hint.tr()
+                              ? LocaleKeys.select_exams_hint.tr()
                               : LocaleKeys.select_group_hint.tr(),
                           style: textTheme.titleMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
@@ -220,33 +234,24 @@ class _HonoredStudentsScreenState extends State<HonoredStudentsScreen> {
                 onSelectionChanged: (set) {
                   setState(() {
                     _filterType = set.first;
-                    _selectedExamId = null;
+                    _selectedExamIds = {};
                     _selectedGroupId = null;
                   });
-                  // No immediate fetch, let user choose from dropdown
                 },
               ),
             ),
           ),
           if (_filterType == FilterType.exam)
-            _buildDropdown<int?>(
-              label: LocaleKeys.select_exam_hint.tr(),
-              value: _selectedExamId,
-              items: state.exams
-                  .map(
-                    (e) => DropdownMenuItem(
-                      value: e['id'] as int,
-                      child: Text(e['name'] as String),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                setState(() {
-                  _selectedExamId = v;
-                });
-                _fetchData();
-              },
-              icon: Icons.description,
+            SizedBox(
+              width: 320.w,
+              child: MultiExamSelector(
+                exams: state.exams,
+                selectedExamIds: _selectedExamIds,
+                onSelectionChanged: (set) {
+                  setState(() => _selectedExamIds = set);
+                  _fetchData();
+                },
+              ),
             )
           else
             _buildDropdown<int?>(
@@ -268,22 +273,49 @@ class _HonoredStudentsScreenState extends State<HonoredStudentsScreen> {
               },
               icon: Icons.groups,
             ),
-          _buildDropdown<int>(
-            label: LocaleKeys.top_n.tr(args: ['']), // Or just use a generic 'Top' if preferred
-            value: _limit,
-            items: _limitOptions
-                .map(
-                  (n) => DropdownMenuItem(value: n, child: Text(n.toString())),
-                )
-                .toList(),
-            onChanged: (v) {
-              if (v != null) {
-                setState(() => _limit = v);
+          SizedBox(
+            width: 270.w,
+            child: SegmentedButton<HonorMarksMode>(
+              segments: [
+                ButtonSegment(
+                  value: HonorMarksMode.highestMarks,
+                  label: Text(LocaleKeys.highest_marks.tr()),
+                  icon: const Icon(Icons.leaderboard_outlined),
+                ),
+                ButtonSegment(
+                  value: HonorMarksMode.fullMark,
+                  label: Text(LocaleKeys.full_mark.tr()),
+                  icon: const Icon(Icons.workspace_premium_outlined),
+                ),
+              ],
+              style: SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.comfortable,
+                padding: EdgeInsets.symmetric(vertical: 12.h),
+              ),
+              selected: {_marksMode},
+              onSelectionChanged: (set) {
+                setState(() => _marksMode = set.first);
                 _fetchData();
-              }
-            },
-            icon: Icons.format_list_numbered,
+              },
+            ),
           ),
+          if (_marksMode == HonorMarksMode.highestMarks)
+            _buildDropdown<int>(
+              label: LocaleKeys.top_n.tr(args: ['']),
+              value: _limit,
+              items: _limitOptions
+                  .map(
+                    (n) => DropdownMenuItem(value: n, child: Text(n.toString())),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => _limit = v);
+                  _fetchData();
+                }
+              },
+              icon: Icons.format_list_numbered,
+            ),
         ],
       ),
     );

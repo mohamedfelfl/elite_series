@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 
+import '../services/data_sync_service.dart';
 import '../services/database_service.dart';
 import '../services/data_migration_service.dart';
 import '../services/encryption_service.dart';
@@ -13,6 +14,9 @@ final getIt = GetIt.instance;
 
 /// Initialize all service dependencies.
 Future<void> configureDependencies() async {
+  // Data Sync
+  getIt.registerLazySingleton<DataSyncService>(() => DataSyncService());
+
   // Encryption
   getIt.registerLazySingleton<EncryptionService>(() => EncryptionService());
 

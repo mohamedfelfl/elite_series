@@ -4,8 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../../../generated/locale_keys.g.dart';
-import '../../../../students/cubits/student_cubit.dart';
 import '../../../cubits/report_cubit.dart';
+import 'student_search_picker.dart';
 
 /// Student report form: select student → generate PDF.
 class StudentReportForm extends StatefulWidget {
@@ -25,33 +25,19 @@ class _StudentReportFormState extends State<StudentReportForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(LocaleKeys.select_student.tr(), style: textTheme.titleMedium),
+        Text(
+          LocaleKeys.select_student.tr(),
+          style: textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         SizedBox(height: 12.h),
-        BlocBuilder<StudentCubit, StudentState>(
-          builder: (context, state) {
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                return DropdownMenu<int?>(
-                  width: constraints.maxWidth,
-                  initialSelection: _selectedStudentId,
-                  label: Text(LocaleKeys.student.tr()),
-                  leadingIcon: const Icon(Icons.person),
-                  enableSearch: true,
-                  enableFilter: true,
-                  dropdownMenuEntries: state.students
-                      .map(
-                        (s) => DropdownMenuEntry<int?>(
-                          value: s['id'] as int,
-                          label: '${s['name']} (${s['serial_number']})',
-                        ),
-                      )
-                      .toList(),
-                  onSelected: (v) {
-                    if (v != null) setState(() => _selectedStudentId = v);
-                  },
-                );
-              },
-            );
+        StudentSearchPicker(
+          selectedStudentId: _selectedStudentId,
+          onStudentSelected: (student) {
+            setState(() {
+              _selectedStudentId = student?['id'] as int?;
+            });
           },
         ),
         SizedBox(height: 24.h),
@@ -82,3 +68,4 @@ class _StudentReportFormState extends State<StudentReportForm> {
     );
   }
 }
+

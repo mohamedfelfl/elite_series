@@ -6,16 +6,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../features/attendance/cubits/lesson_cubit.dart';
 import '../../../features/auth/cubits/auth_cubit.dart';
 import '../../../features/auth/models/user.dart';
+import '../../../features/dashboard/cubits/dashboard_cubit.dart';
+import '../../../features/groups/cubits/group_cubit.dart';
+import '../../../features/qr_card_generator/presentation/cubits/qr_card_cubit.dart';
+import '../../../features/settings/widgets/update_banner.dart';
+import '../../../features/students/cubits/student_cubit.dart';
 import '../../../generated/locale_keys.g.dart';
+import '../../constants/dimens.dart';
 import '../../cubits/locale_cubit.dart';
 import '../../cubits/shell_navigation_cubit.dart';
 import '../../router/app_router.gr.dart';
-import '../../constants/dimens.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/theme_mask/animated_theme_switch.dart';
-import '../../../features/settings/widgets/update_banner.dart';
 
 @RoutePage(name: 'ShellRoute')
 class ShellScreen extends StatelessWidget {
@@ -155,6 +160,7 @@ class ShellScreen extends StatelessWidget {
                     colorScheme,
                     destinations,
                     tabsRouter,
+                    filteredRoutes,
                   ),
                   appBar: AppBar(
                     title: Text(
@@ -185,7 +191,12 @@ class ShellScreen extends StatelessWidget {
                         child: ResponsiveLayout(
                           isCollapsed: navState.isCollapsed,
                           selectedIndex: tabsRouter.activeIndex,
-                          onDestinationSelected: tabsRouter.setActiveIndex,
+                          onDestinationSelected: (idx) => _onTabSelected(
+                            idx,
+                            tabsRouter,
+                            context,
+                            filteredRoutes,
+                          ),
                           destinations: destinations,
                           leading: Padding(
                             padding: EdgeInsets.all(AppDimens.p8),
@@ -273,12 +284,38 @@ class ShellScreen extends StatelessWidget {
     );
   }
 
+  void _onTabSelected(
+    int index,
+    TabsRouter tabsRouter,
+    BuildContext context,
+    List<PageRouteInfo> routes,
+  ) {
+    tabsRouter.setActiveIndex(index);
+    if (index >= 0 && index < routes.length) {
+      final selectedRoute = routes[index];
+      if (selectedRoute is DashboardRoute) {
+        context.read<DashboardCubit>().loadDashboard();
+      } else if (selectedRoute is StudentListRoute) {
+        context.read<StudentCubit>().loadStudents();
+      } else if (selectedRoute is GroupListRoute) {
+        context.read<GroupCubit>().loadGroups();
+      } else if (selectedRoute is PaymentListRoute) {
+        context.read<StudentCubit>().loadStudents();
+      } else if (selectedRoute is QrScannerRoute) {
+        context.read<LessonCubit>().loadLessonsForDate(DateTime.now());
+      } else if (selectedRoute is QrCardGeneratorRoute) {
+        context.read<QrCardCubit>().loadInitialData();
+      }
+    }
+  }
+
   Widget _buildDrawer(
     BuildContext context,
     bool isDark,
     ColorScheme colorScheme,
     List<NavigationRailDestination> destinations,
     TabsRouter tabsRouter,
+    List<PageRouteInfo> routes,
   ) {
     return Drawer(
       child: ClipRRect(
@@ -392,7 +429,7 @@ class ShellScreen extends StatelessWidget {
                       contentPadding: EdgeInsets.symmetric(horizontal: AppDimens.p16),
                       onTap: () {
                         Navigator.pop(context);
-                        tabsRouter.setActiveIndex(i);
+                        _onTabSelected(i, tabsRouter, context, routes);
                       },
                     ),
                   ),

@@ -137,7 +137,9 @@ if (-not (Test-Path $releasesDir)) {
 if ($RepoUrl -and -not $Clean) {
     Write-Host "`nDownloading previous releases from GitHub for delta generation..." -ForegroundColor Cyan
     try {
-        vpk download github --repoUrl $RepoUrl --outputDir $releasesDir
+        $downloadArgs = @("download", "github", "--repoUrl", $RepoUrl, "--outputDir", $releasesDir)
+        if ($Token) { $downloadArgs += @("--token", $Token) }
+        & vpk @downloadArgs
     }
     catch {
         Write-Warning "Could not download previous releases from GitHub. Proceeding with full package build."

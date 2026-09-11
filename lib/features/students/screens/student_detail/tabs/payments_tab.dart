@@ -59,10 +59,12 @@ class PaymentsTab extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        isFree ? Icons.info_outline : Icons.payments_outlined,
+                        isFree
+                            ? Icons.card_giftcard_rounded
+                            : Icons.payments_outlined,
                         size: 64,
                         color: isFree
-                            ? colorScheme.error.withValues(alpha: 0.5)
+                            ? Colors.amber.shade700
                             : colorScheme.primary.withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 16),
@@ -70,14 +72,11 @@ class PaymentsTab extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 32),
                         child: Text(
                           isFree
-                              ? LocaleKeys.payment_disabled_free_student.tr()
+                              ? '${LocaleKeys.free_student.tr()} - ${LocaleKeys.exempt_no_payments.tr()}'
                               : LocaleKeys.no_payment_records.tr(),
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(
-                                color: isFree
-                                    ? Theme.of(context).colorScheme.error
-                                    : null,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                color: isFree ? Colors.amber.shade900 : null,
                                 fontWeight: isFree ? FontWeight.bold : null,
                               ),
                         ),
@@ -161,11 +160,17 @@ class PaymentsTab extends StatelessWidget {
                             label: Text(
                               isPaid
                                   ? LocaleKeys.paid.tr()
-                                  : LocaleKeys.due_amount.tr(
-                                      args: [remaining.toStringAsFixed(2)],
-                                    ),
+                                  : (isFree
+                                      ? LocaleKeys.free.tr()
+                                      : LocaleKeys.due_amount.tr(
+                                          args: [remaining.toStringAsFixed(2)],
+                                        )),
                               style: TextStyle(
-                                color: isPaid ? Colors.green : Colors.red,
+                                color: isPaid
+                                    ? Colors.green
+                                    : (isFree
+                                        ? Colors.amber.shade800
+                                        : Colors.red),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

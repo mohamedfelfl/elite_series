@@ -2,6 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import '../../../app/constants/db_queries.dart';
+import '../../../app/di/injection.dart';
+import '../../../app/services/data_sync_service.dart';
 import '../../../app/services/database_service.dart';
 
 part 'payment_cubit.freezed.dart';
@@ -19,10 +21,17 @@ abstract class PaymentState with _$PaymentState {
 
 class PaymentCubit extends Cubit<PaymentState> {
   final DatabaseService _databaseService;
+  final DataSyncService? _dataSyncService;
 
-  PaymentCubit({required DatabaseService databaseService})
-    : _databaseService = databaseService,
-      super(const PaymentState());
+  PaymentCubit({
+    required DatabaseService databaseService,
+    DataSyncService? dataSyncService,
+  })  : _databaseService = databaseService,
+        _dataSyncService = dataSyncService ??
+            (getIt.isRegistered<DataSyncService>()
+                ? getIt<DataSyncService>()
+                : null),
+        super(const PaymentState());
 
   /// Load payments for a specific student.
   Future<void> loadPayments(int studentId) async {
@@ -72,6 +81,7 @@ class PaymentCubit extends Cubit<PaymentState> {
       });
 
       await loadPayments(studentId);
+      _dataSyncService?.notifyPaymentsChanged();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
@@ -83,12 +93,34 @@ class PaymentCubit extends Cubit<PaymentState> {
       final Database db = await _databaseService.database;
       final String dateStr = date.toIso8601String().split('T')[0];
 
-      final List<Map<String, Object?>> results = await db.rawQuery(
+      final List<Map<String, Object?>> paymentRows = await db.rawQuery(
         DBQueries.loadDailyPaymentsBase,
         ['$dateStr%'],
       );
 
-      emit(state.copyWith(dailyPayments: results, isLoading: false));
+      final List<Map<String, Object?>> freeStudentsAttended = await db.rawQuery(
+        '''
+        SELECT DISTINCT s.id as student_id, s.name as student_name, s.serial_number, s.student_status,
+               0.0 as paid_amount, 0.0 as total_amount, a.date as paid_date, 0 as month, 0 as year
+        FROM attendance a
+        JOIN students s ON a.student_id = s.id
+        WHERE a.date = ? AND s.student_status = 'free'
+        ORDER BY s.name ASC
+        ''',
+        [dateStr],
+      );
+
+      final Set<dynamic> existingStudentIds =
+          paymentRows.map((r) => r['student_id']).toSet();
+
+      final List<Map<String, dynamic>> combined = [
+        ...paymentRows.map((r) => Map<String, dynamic>.from(r)),
+        ...freeStudentsAttended
+            .where((r) => !existingStudentIds.contains(r['student_id']))
+            .map((r) => Map<String, dynamic>.from(r)),
+      ];
+
+      emit(state.copyWith(dailyPayments: combined, isLoading: false));
     } catch (e) {
       emit(state.copyWith(error: e.toString(), isLoading: false));
     }
@@ -107,6 +139,7 @@ class PaymentCubit extends Cubit<PaymentState> {
       // Reload for the student
       final Object? studentId = data['student_id'];
       if (studentId != null) await loadPayments(studentId as int);
+      _dataSyncService?.notifyPaymentsChanged();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
@@ -117,6 +150,7 @@ class PaymentCubit extends Cubit<PaymentState> {
       final Database db = await _databaseService.database;
       await db.delete(DBQueries.tablePayments, where: 'id = ?', whereArgs: <Object?>[id]);
       await loadPayments(studentId);
+      _dataSyncService?.notifyPaymentsChanged();
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }

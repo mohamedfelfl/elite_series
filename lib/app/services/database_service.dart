@@ -92,6 +92,9 @@ class DatabaseService {
             // Execute PRAGMA key first to unlock the SQLCipher database
             await db.execute("PRAGMA key = '$password'");
             await db.execute('PRAGMA foreign_keys = ON');
+            await db.execute('PRAGMA busy_timeout = 5000');
+            await db.execute('PRAGMA journal_mode = WAL');
+            await db.execute('PRAGMA synchronous = NORMAL');
           },
         ),
       );
@@ -104,6 +107,9 @@ class DatabaseService {
         onOpen: _onOpen,
         onConfigure: (db) async {
           await db.execute('PRAGMA foreign_keys = ON');
+          await db.execute('PRAGMA busy_timeout = 5000');
+          await db.execute('PRAGMA journal_mode = WAL');
+          await db.execute('PRAGMA synchronous = NORMAL');
         },
       );
     }
@@ -159,6 +165,9 @@ class DatabaseService {
     await db.execute(DBQueries.createIdxLessonsDate);
     await db.execute(DBQueries.createIdxLessonsStatus);
     await db.execute(DBQueries.createIdxAttendanceLesson);
+    await db.execute(DBQueries.createIdxStudentsSerial);
+    await db.execute(DBQueries.createIdxStudentsName);
+    await db.execute(DBQueries.createIdxAttendanceLessonStudent);
   }
 
   /// Ensure all required tables exist on every open.
@@ -212,6 +221,9 @@ class DatabaseService {
     try {
       await db.execute(DBQueries.alterAttendanceAddLessonId);
     } catch (_) {}
+    try {
+      await db.execute(DBQueries.alterLessonsAddCreatedAt);
+    } catch (_) {}
 
     // Ensure indexes exist
     try {
@@ -229,6 +241,9 @@ class DatabaseService {
       await db.execute(DBQueries.createIdxLessonsDate);
       await db.execute(DBQueries.createIdxLessonsStatus);
       await db.execute(DBQueries.createIdxAttendanceLesson);
+      await db.execute(DBQueries.createIdxStudentsSerial);
+      await db.execute(DBQueries.createIdxStudentsName);
+      await db.execute(DBQueries.createIdxAttendanceLessonStudent);
     } catch (_) {}
 
     // Auto-migrate legacy attendance records without a lesson_id

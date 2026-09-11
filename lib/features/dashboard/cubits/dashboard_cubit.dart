@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 
 import '../../../app/constants/db_queries.dart';
+import '../../../app/di/injection.dart';
+import '../../../app/services/data_sync_service.dart';
 import '../../../app/services/database_service.dart';
 
 part 'dashboard_cubit.freezed.dart';
@@ -26,13 +30,27 @@ abstract class DashboardState with _$DashboardState {
 
 class DashboardCubit extends Cubit<DashboardState> {
   final DatabaseService _databaseService;
+  final DataSyncService? _dataSyncService;
+  StreamSubscription<SyncEntity>? _syncSub;
 
-  DashboardCubit({required DatabaseService databaseService})
-    : _databaseService = databaseService,
-      super(const DashboardState());
+  DashboardCubit({
+    required DatabaseService databaseService,
+    DataSyncService? dataSyncService,
+  })  : _databaseService = databaseService,
+        _dataSyncService = dataSyncService ??
+            (getIt.isRegistered<DataSyncService>()
+                ? getIt<DataSyncService>()
+                : null),
+        super(const DashboardState()) {
+    _syncSub = _dataSyncService?.syncStream.listen((_) {
+      loadDashboard(silent: true);
+    });
+  }
 
-  Future<void> loadDashboard() async {
-    emit(state.copyWith(isLoading: true, error: null));
+  Future<void> loadDashboard({bool silent = false}) async {
+    if (!silent) {
+      emit(state.copyWith(isLoading: true, error: null));
+    }
     try {
       final db = await _databaseService.database;
 
@@ -127,5 +145,11 @@ class DashboardCubit extends Cubit<DashboardState> {
     } catch (e) {
       emit(state.copyWith(error: e.toString(), isLoading: false));
     }
+  }
+
+  @override
+  Future<void> close() {
+    _syncSub?.cancel();
+    return super.close();
   }
 }

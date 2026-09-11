@@ -117,7 +117,7 @@ class _GroupPaymentsReportFormState extends State<GroupPaymentsReportForm> {
                         .map(
                           (g) => DropdownMenuEntry<int?>(
                             value: g['id'] as int,
-                            label: _cleanGroupName(g['name'] as String),
+                            label: g['name'] as String,
                           ),
                         )
                         .toList(),
@@ -222,13 +222,5 @@ class _GroupPaymentsReportFormState extends State<GroupPaymentsReportForm> {
         ],
       ),
     );
-  }
-
-  static String _cleanGroupName(String name) {
-    String n = name.trim();
-    n = n.replaceAll('الثللاثاء', 'الثلاثاء');
-    n = n.replaceAll(RegExp(r'\s*[123]\s*ث\s*'), ' ');
-    n = n.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return n;
   }
 }
