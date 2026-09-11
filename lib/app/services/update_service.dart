@@ -86,64 +86,50 @@ class VelopackUpdateService implements UpdateService {
     try {
       final response = await _httpClient.get(
         url,
-        headers: {'Accept': 'application/vnd.github.v3+json'},
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'EliteSeries-App',
+        },
       ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final rawTag = data['tag_name'] as String? ?? '';
-        final cleanTag = rawTag.replaceAll(RegExp(r'^[vV]'), '').trim();
-        final body = data['body'] as String? ?? '';
-        final assets = data['assets'] as List<dynamic>? ?? [];
+      if (response.statusCode != 200) {
+        if (response.statusCode == 404) {
+          // No releases published yet
+          return null;
+        }
+        if (response.statusCode == 403) {
+          throw Exception('GitHub API rate limit exceeded. Please try again later.');
+        }
+        throw Exception('GitHub API error (${response.statusCode}): ${response.reasonPhrase ?? "Request failed"}');
+      }
 
-        int? packageSize;
-        String? assetDownloadUrl;
-        String? targetFileName;
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final rawTag = data['tag_name'] as String? ?? '';
+      final cleanTag = rawTag.replaceAll(RegExp(r'^[vV]'), '').trim();
+      final body = data['body'] as String? ?? '';
+      final assets = data['assets'] as List<dynamic>? ?? [];
 
-        if (_isInstalledApp) {
-          // 1. Prefer full nupkg package (guarantees all binaries exist across any version jump)
-          for (final asset in assets) {
-            final name = (asset['name'] as String? ?? '').toLowerCase();
-            if (name.contains(cleanTag.toLowerCase()) && name.endsWith('full.nupkg')) {
-              assetDownloadUrl = asset['browser_download_url'] as String?;
-              packageSize = asset['size'] as int?;
-              targetFileName = asset['name'] as String?;
-              break;
-            }
-          }
+      int? packageSize;
+      String? assetDownloadUrl;
+      String? targetFileName;
 
-          // 2. Fallback to any full nupkg
-          if (assetDownloadUrl == null) {
-            for (final asset in assets) {
-              final name = (asset['name'] as String? ?? '').toLowerCase();
-              if (name.endsWith('full.nupkg')) {
-                assetDownloadUrl = asset['browser_download_url'] as String?;
-                packageSize = asset['size'] as int?;
-                targetFileName = asset['name'] as String?;
-                break;
-              }
-            }
-          }
-
-          // 3. Fallback to non-delta nupkg
-          if (assetDownloadUrl == null) {
-            for (final asset in assets) {
-              final name = (asset['name'] as String? ?? '').toLowerCase();
-              if (name.endsWith('.nupkg') && !name.endsWith('delta.nupkg')) {
-                assetDownloadUrl = asset['browser_download_url'] as String?;
-                packageSize = asset['size'] as int?;
-                targetFileName = asset['name'] as String?;
-                break;
-              }
-            }
+      if (_isInstalledApp) {
+        // 1. Prefer full nupkg package (guarantees all binaries exist across any version jump)
+        for (final asset in assets) {
+          final name = (asset['name'] as String? ?? '').toLowerCase();
+          if (name.contains(cleanTag.toLowerCase()) && name.endsWith('full.nupkg')) {
+            assetDownloadUrl = asset['browser_download_url'] as String?;
+            packageSize = asset['size'] as int?;
+            targetFileName = asset['name'] as String?;
+            break;
           }
         }
 
-        // For non-installed / standalone apps or fallback: prefer Setup.exe
+        // 2. Fallback to any full nupkg
         if (assetDownloadUrl == null) {
           for (final asset in assets) {
             final name = (asset['name'] as String? ?? '').toLowerCase();
-            if (name.contains('setup') && name.endsWith('.exe')) {
+            if (name.endsWith('full.nupkg')) {
               assetDownloadUrl = asset['browser_download_url'] as String?;
               packageSize = asset['size'] as int?;
               targetFileName = asset['name'] as String?;
@@ -152,35 +138,62 @@ class VelopackUpdateService implements UpdateService {
           }
         }
 
+        // 3. Fallback to non-delta nupkg
         if (assetDownloadUrl == null) {
           for (final asset in assets) {
             final name = (asset['name'] as String? ?? '').toLowerCase();
-            if (name.endsWith('.exe') || (name.endsWith('.nupkg') && !name.endsWith('delta.nupkg'))) {
+            if (name.endsWith('.nupkg') && !name.endsWith('delta.nupkg')) {
               assetDownloadUrl = asset['browser_download_url'] as String?;
               packageSize = asset['size'] as int?;
               targetFileName = asset['name'] as String?;
               break;
             }
           }
-        }
-
-        _latestDownloadUrl = assetDownloadUrl;
-        _downloadedFileName = targetFileName;
-
-        if (cleanTag.isNotEmpty && _isNewerVersion(current, cleanTag, allowDowngrade)) {
-          return AppUpdateInfo(
-            currentVersion: current,
-            targetVersion: cleanTag,
-            releaseNotes: body.isNotEmpty ? body : 'General improvements and bug fixes.',
-            packageSize: packageSize,
-            publishedAt: data['published_at'] != null ? DateTime.tryParse(data['published_at']) : null,
-          );
         }
       }
+
+      // For non-installed / standalone apps or fallback: prefer Setup.exe
+      if (assetDownloadUrl == null) {
+        for (final asset in assets) {
+          final name = (asset['name'] as String? ?? '').toLowerCase();
+          if (name.contains('setup') && name.endsWith('.exe')) {
+            assetDownloadUrl = asset['browser_download_url'] as String?;
+            packageSize = asset['size'] as int?;
+            targetFileName = asset['name'] as String?;
+            break;
+          }
+        }
+      }
+
+      if (assetDownloadUrl == null) {
+        for (final asset in assets) {
+          final name = (asset['name'] as String? ?? '').toLowerCase();
+          if (name.endsWith('.exe') || (name.endsWith('.nupkg') && !name.endsWith('delta.nupkg'))) {
+            assetDownloadUrl = asset['browser_download_url'] as String?;
+            packageSize = asset['size'] as int?;
+            targetFileName = asset['name'] as String?;
+            break;
+          }
+        }
+      }
+
+      _latestDownloadUrl = assetDownloadUrl;
+      _downloadedFileName = targetFileName;
+
+      if (cleanTag.isNotEmpty && isNewerVersion(current, cleanTag, allowDowngrade: allowDowngrade)) {
+        return AppUpdateInfo(
+          currentVersion: current,
+          targetVersion: cleanTag,
+          releaseNotes: body.isNotEmpty ? body : 'General improvements and bug fixes.',
+          packageSize: packageSize,
+          publishedAt: data['published_at'] != null ? DateTime.tryParse(data['published_at']) : null,
+        );
+      }
+      return null;
     } catch (e) {
       debugPrint('[VelopackUpdateService] checkForUpdate error: $e');
+      rethrow;
     }
-    return null;
   }
 
   /// Resolves the directory where update packages should be downloaded and staged.
@@ -217,6 +230,7 @@ class VelopackUpdateService implements UpdateService {
     try {
       final uri = Uri.parse(downloadUrl);
       final request = http.Request('GET', uri);
+      request.headers['User-Agent'] = 'EliteSeries-App';
       final response = await _httpClient.send(request);
 
       if (response.statusCode != 200) {
@@ -365,24 +379,39 @@ class VelopackUpdateService implements UpdateService {
     return null;
   }
 
-  /// Compares semantic versions (e.g. "1.1.0" > "1.0.0").
-  bool _isNewerVersion(String current, String target, bool allowDowngrade) {
+  /// Compares semantic versions (e.g. "1.1.0" > "1.0.0", "1.0.3" > "1.0.2+3").
+  @visibleForTesting
+  static bool isNewerVersion(String current, String target, {bool allowDowngrade = false}) {
     if (allowDowngrade) return current != target;
     try {
-      final curParts = current.split('.').map((e) => int.tryParse(e.replaceAll(RegExp(r'\D'), '')) ?? 0).toList();
-      final tarParts = target.split('.').map((e) => int.tryParse(e.replaceAll(RegExp(r'\D'), '')) ?? 0).toList();
+      List<int> parse(String v) {
+        final clean = v.replaceFirst(RegExp(r'^[vV]'), '').trim();
+        final plusIndex = clean.indexOf('+');
+        final core = plusIndex != -1 ? clean.substring(0, plusIndex) : clean;
+        final buildStr = plusIndex != -1 ? clean.substring(plusIndex + 1) : '';
 
-      while (curParts.length < 3) {
-        curParts.add(0);
-      }
-      while (tarParts.length < 3) {
-        tarParts.add(0);
+        final parts = core
+            .split('.')
+            .map((e) => int.tryParse(e.split('-').first.replaceAll(RegExp(r'\D'), '')) ?? 0)
+            .toList();
+        while (parts.length < 3) {
+          parts.add(0);
+        }
+        final build = int.tryParse(buildStr.replaceAll(RegExp(r'\D'), '')) ?? 0;
+        return [parts[0], parts[1], parts[2], build];
       }
 
+      final cur = parse(current);
+      final tar = parse(target);
+
+      // Compare Major, Minor, Patch
       for (int i = 0; i < 3; i++) {
-        if (tarParts[i] > curParts[i]) return true;
-        if (tarParts[i] < curParts[i]) return false;
+        if (tar[i] > cur[i]) return true;
+        if (tar[i] < cur[i]) return false;
       }
+
+      // If core versions (major, minor, patch) are identical, compare build number
+      if (tar[3] > cur[3]) return true;
     } catch (_) {}
     return false;
   }
