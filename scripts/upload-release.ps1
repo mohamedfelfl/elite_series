@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.0.0",
+    [string]$Version,
     [string]$Token,
     [string]$RepoUrl = "https://github.com/mohamedfelfl/elite_series"
 )
@@ -9,6 +9,22 @@ $env:DOTNET_ROLL_FORWARD = "LatestMajor"
 $dotnetDir = "$env:USERPROFILE\.dotnet"
 $toolsDir = "$env:USERPROFILE\.dotnet\tools"
 $env:PATH = "$dotnetDir;$toolsDir;$env:PATH"
+
+# Resolve version from pubspec.yaml if not provided
+if (-not $Version) {
+    if (Test-Path "pubspec.yaml") {
+        $pubspec = Get-Content "pubspec.yaml" -Raw
+        if ($pubspec -match 'version:\s*([0-9]+\.[0-9]+\.[0-9]+)') {
+            $Version = $matches[1]
+            Write-Host "Resolved version from pubspec.yaml: $Version" -ForegroundColor Green
+        }
+    }
+}
+
+if (-not $Version) {
+    Write-Error "Version must be specified or defined in pubspec.yaml (e.g. 1.0.3)"
+    exit 1
+}
 
 if (-not $Token) {
     if ($env:GITHUB_TOKEN) { $Token = $env:GITHUB_TOKEN }
