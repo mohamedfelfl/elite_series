@@ -1,7 +1,7 @@
 name: student_management_system
 description: "A premium Student Management System for managing students, payments, attendance, exams, and reports."
 publish_to: 'none'
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: ^3.11.1

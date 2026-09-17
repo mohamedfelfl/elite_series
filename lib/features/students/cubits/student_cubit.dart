@@ -408,21 +408,35 @@ class StudentCubit extends Cubit<StudentState> {
   }
 
   Future<Map<String, dynamic>?> getStudentBySerial(String rawSerial) async {
-    final serial = QrCodeHelper.extractSerialNumber(rawSerial);
-    if (serial.isEmpty) return null;
+    final candidates = QrCodeHelper.extractAllCandidates(rawSerial);
+    if (candidates.isEmpty) return null;
 
     try {
       final Database db = await _databaseService.database;
+      final placeholders = List.filled(candidates.length, '?').join(',');
       List<Map<String, Object?>> results = await db.rawQuery(
-        DBQueries.getStudentBySerial,
-        <Object?>[serial],
+        '''
+        SELECT s.*, g.name as group_name
+        FROM students s
+        LEFT JOIN groups g ON s.group_id = g.id
+        WHERE TRIM(s.serial_number) COLLATE NOCASE IN ($placeholders)
+        ''',
+        candidates,
       );
 
-      if (results.isEmpty && rawSerial.trim() != serial) {
-        results = await db.rawQuery(
-          DBQueries.getStudentBySerial,
-          <Object?>[rawSerial.trim()],
-        );
+      if (results.isEmpty) {
+        final numericId = QrCodeHelper.extractNumericId(rawSerial);
+        if (numericId != null) {
+          results = await db.rawQuery(
+            '''
+            SELECT s.*, g.name as group_name
+            FROM students s
+            LEFT JOIN groups g ON s.group_id = g.id
+            WHERE s.id = ?
+            ''',
+            [numericId],
+          );
+        }
       }
 
       return results.isNotEmpty ? results.first : null;

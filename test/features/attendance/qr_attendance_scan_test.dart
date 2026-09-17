@@ -113,5 +113,76 @@ void main() {
       expect(student['serial_number'], equals('EL-01-00003'));
       expect(student['name'], equals('أحمد محمد علي'));
     });
+
+    test('LessonCubit and AttendanceCubit find student when scanned with reversed serial 00202-03-EL', () async {
+      // Insert student with EL-03-00202
+      await db.insert('students', {
+        'id': 2802,
+        'serial_number': 'EL-03-00202',
+        'name': 'رحاب عاصم احمد',
+        'group_id': 1,
+        'grade': 'sec_3',
+      });
+
+      const scheduledLesson = Lesson(
+        groupId: 1,
+        date: '2026-08-29',
+        startTime: '11:00',
+        title: 'الدرس الثاني',
+      );
+      await lessonCubit.startLesson(scheduledLesson);
+
+      // Scan with RTL-reversed serial
+      await lessonCubit.recordScanInActiveLesson('00202-03-EL');
+
+      expect(lessonCubit.state.scanSuccess, isTrue);
+      expect(lessonCubit.state.lastScannedStudent, equals('رحاب عاصم احمد'));
+      expect(lessonCubit.state.error, isNull);
+
+      // Also verify StudentCubit finds this student
+      final foundStudent = await studentCubit.getStudentBySerial('00202-03-EL');
+      expect(foundStudent, isNotNull);
+      expect(foundStudent!['name'], equals('رحاب عاصم احمد'));
+    });
+
+    test('Finds student when scanned with Arabic numerals or Arabic keyboard layout', () async {
+      // Arabic numerals
+      final studentByArabicDigits = await studentCubit.getStudentBySerial('EL-٠١-٠٠٠٠٣');
+      expect(studentByArabicDigits, isNotNull);
+      expect(studentByArabicDigits!['name'], equals('أحمد محمد علي'));
+
+      // Arabic keyboard layout (ثم-01-00003)
+      final studentByArabicLayout = await studentCubit.getStudentBySerial('ثم-01-00003');
+      expect(studentByArabicLayout, isNotNull);
+      expect(studentByArabicLayout!['name'], equals('أحمد محمد علي'));
+    });
+
+    test('Finds student with lowercase serial and extra whitespace in database', () async {
+      await db.insert('students', {
+        'id': 555,
+        'serial_number': '  el-02-00555  ',
+        'name': 'طالب بأحرف صغيرة',
+        'group_id': 1,
+        'grade': 'sec_2',
+      });
+
+      final student = await studentCubit.getStudentBySerial('EL-02-00555');
+      expect(student, isNotNull);
+      expect(student!['id'], equals(555));
+    });
+
+    test('Finds student by numeric ID fallback', () async {
+      await db.insert('students', {
+        'id': 777,
+        'serial_number': 'OLD-FORMAT-777',
+        'name': 'طالب بالمعرف القديم',
+        'group_id': 1,
+        'grade': 'sec_1',
+      });
+
+      final student = await studentCubit.getStudentBySerial('777');
+      expect(student, isNotNull);
+      expect(student!['id'], equals(777));
+    });
   });
 }

@@ -22,15 +22,16 @@ class MobileScannerView extends StatelessWidget {
   });
 
   void _handleScan(BuildContext context, String rawValue) {
-    final serial = QrCodeHelper.extractSerialNumber(rawValue);
-    if (serial.isEmpty) return;
-
+    final clean = rawValue.trim();
+    final serial = QrCodeHelper.extractSerialNumber(clean);
     manualController.clear();
+    if (clean.isEmpty && serial.isEmpty) return;
 
+    final lookupKey = serial.isNotEmpty ? serial : clean;
     if (onScan != null) {
-      onScan!(serial);
+      onScan!(lookupKey);
     } else {
-      context.read<AttendanceCubit>().recordAttendanceBySerial(serial);
+      context.read<AttendanceCubit>().recordAttendanceBySerial(lookupKey);
     }
   }
 

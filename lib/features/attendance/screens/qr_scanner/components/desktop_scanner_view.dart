@@ -31,23 +31,25 @@ class _DesktopScannerViewState extends State<DesktopScannerView> {
   String _lastScanned = '';
 
   void _handleScan(BuildContext context, String rawValue) {
-    final serial = QrCodeHelper.extractSerialNumber(rawValue);
+    final clean = rawValue.trim();
+    final serial = QrCodeHelper.extractSerialNumber(clean);
     widget.manualController.clear();
     widget.focusNode?.requestFocus();
-    if (serial.isEmpty) return;
+    if (clean.isEmpty && serial.isEmpty) return;
 
+    final lookupKey = serial.isNotEmpty ? serial : clean;
     final now = DateTime.now();
     if (now.difference(_lastScanTime).inMilliseconds < 800 &&
-        _lastScanned == serial) {
+        _lastScanned == lookupKey) {
       return;
     }
     _lastScanTime = now;
-    _lastScanned = serial;
+    _lastScanned = lookupKey;
 
     if (widget.onScan != null) {
-      widget.onScan!(serial);
+      widget.onScan!(lookupKey);
     } else {
-      context.read<AttendanceCubit>().recordAttendanceBySerial(serial);
+      context.read<AttendanceCubit>().recordAttendanceBySerial(lookupKey);
     }
   }
 

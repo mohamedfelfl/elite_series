@@ -314,19 +314,33 @@ class LessonCubit extends Cubit<LessonState> {
     try {
       final Database db = await _databaseService.database;
 
-      // Find student by candidate serials using index
+      // Find student by candidate serials using index & case-insensitive matching
       final placeholders = List.filled(candidates.length, '?').join(',');
       List<Map<String, Object?>> students = await db.query(
         DBQueries.tableStudents,
-        where: 'serial_number IN ($placeholders)',
+        where: 'TRIM(serial_number) COLLATE NOCASE IN ($placeholders)',
         whereArgs: candidates,
       );
 
+      // Fallback: If not found by candidate serials, attempt lookup by numeric ID / sequence number
       if (students.isEmpty) {
+        final numericId = QrCodeHelper.extractNumericId(rawScan);
+        if (numericId != null) {
+          students = await db.query(
+            DBQueries.tableStudents,
+            where: 'id = ?',
+            whereArgs: [numericId],
+          );
+        }
+      }
+
+      if (students.isEmpty) {
+        final displaySerial =
+            serialNumber.isNotEmpty ? serialNumber : rawScan.trim();
         emit(
           state.copyWith(
             error: LocaleKeys.student_not_found_with_serial.tr(
-              args: [serialNumber.isNotEmpty ? serialNumber : rawScan.trim()],
+              args: ['\u2066$displaySerial\u2069'],
             ),
             scanSuccess: false,
           ),

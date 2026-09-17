@@ -91,14 +91,14 @@ class _QrScannerScreenState extends State<QrScannerScreen>
   }
 
   void _onScanReceived(String rawScan) {
-    final serial = QrCodeHelper.extractSerialNumber(rawScan);
-    if (serial.isEmpty) return;
+    final clean = rawScan.trim();
+    if (clean.isEmpty) return;
 
     final activeLesson = context.read<LessonCubit>().state.activeLesson;
     if (activeLesson != null) {
-      context.read<LessonCubit>().recordScanInActiveLesson(serial);
+      context.read<LessonCubit>().recordScanInActiveLesson(clean);
     } else {
-      context.read<AttendanceCubit>().recordAttendanceBySerial(serial);
+      context.read<AttendanceCubit>().recordAttendanceBySerial(clean);
     }
   }
 

@@ -150,14 +150,16 @@ class QrCardTemplateWidget extends StatelessWidget {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: Directionality(
-                  textDirection: TextDirection.rtl,
+                  textDirection: student.groupSchedule.isNotEmpty
+                      ? TextDirection.rtl
+                      : TextDirection.ltr,
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerRight,
                     child: Text(
                       student.groupSchedule.isNotEmpty
                           ? _formatScheduleArabic(student.groupSchedule)
-                          : student.studentCode,
+                          : '\u2066${student.studentCode}\u2069',
                       textAlign: TextAlign.right,
                       style: AppTypography.cairo(
                         fontSize: 12.0 * scale,
